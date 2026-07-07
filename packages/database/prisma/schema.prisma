@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String
+  role          Role      @default(MEMBER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  projects      Project[] @relation("ProjectOwner")
+  assignments   Assignment[]
+  auditLogs     AuditLog[]
+}
+
+model Project {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  status      ProjectStatus @default(PLANNED)
+  ownerId     String
+  owner       User      @relation("ProjectOwner", fields: [ownerId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  tasks       Task[]
+  assets      Asset[]
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus @default(TODO)
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id])
+  assignments Assignment[]
+  deadline    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Assignment {
+  id          String    @id @default(cuid())
+  taskId      String
+  task        Task      @relation(fields: [taskId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  role        AssignmentRole @default(ASSIGNEE)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Asset {
+  id          String    @id @default(cuid())
+  name        String
+  url         String
+  type        AssetType
+  size        Int
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id])
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  action      String
+  entityId    String
+  entityType  String
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  payload     Json?
+  createdAt   DateTime  @default(now())
+}
+
+enum Role {
+  ADMIN
+  CREATIVE_DIRECTOR
+  MEMBER
+  VOLUNTEER
+}
+
+enum ProjectStatus {
+  PLANNED
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+  ARCHIVED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+enum AssignmentRole {
+  ASSIGNEE
+  REVIEWER
+  APPROVER
+}
+
+enum AssetType {
+  VIDEO
+  IMAGE
+  AUDIO
+  DOCUMENT
+  PROJECT_FILE
+}
