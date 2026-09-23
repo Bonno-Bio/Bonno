@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
-import { requirePlatformAdmin, writePlatformAudit } from "@/lib/firebase/admin-auth";
+import { requirePlatformAdmin, requireSupportGrant, writePlatformAudit } from "@/lib/firebase/admin-auth";
 
 export async function GET(request: Request, context: { params: { id: string } }) {
   try {
-    await requirePlatformAdmin(request);
+    const admin = await requirePlatformAdmin(request, "support");
+    await requireSupportGrant(request, admin, context.params.id);
     const ref = adminDb().doc(`businesses/${context.params.id}`); const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const [members, subscription, payments, audit] = await Promise.all([ref.collection("members").get(), ref.collection("meta").doc("subscription").get(), ref.collection("billing_payments").orderBy("createdAt", "desc").limit(50).get(), ref.collection("audit_logs").orderBy("createdAt", "desc").limit(50).get()]);

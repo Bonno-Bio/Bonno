@@ -35,6 +35,7 @@ export async function runBackgroundJobs(now = new Date()): Promise<JobReport> {
     await resetAiCredits(business.ref, now, report.aiReset);
     await scheduleSubscriptionReminder(business.ref, sub.data(), now, report.subscriptions);
   }
+  await db.collection("job_runs").add({ type: "daily", status: "success", startedAt: report.ranAt, finishedAt: new Date().toISOString(), report });
   return report;
 }
 

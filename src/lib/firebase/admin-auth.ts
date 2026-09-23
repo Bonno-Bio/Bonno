@@ -21,3 +21,15 @@ export async function writePlatformAudit(admin: DecodedIdToken, action: string, 
   if (!adminConfigured()) return;
   await adminDb().collection("platform_audit_logs").add({ adminUid: admin.uid, adminEmail: admin.email ?? null, adminRole: admin.adminRole ?? null, action, target: target ?? null, metadata: metadata ?? {}, createdAt: new Date().toISOString() });
 }
+
+export async function requireSupportGrant(request: Request, admin: DecodedIdToken, businessId: string) {
+  if (admin.adminRole === "super_admin") return null;
+  if (admin.adminRole !== "support") throw new Error("SUPPORT_ROLE_REQUIRED");
+  const grantId = request.headers.get("x-support-grant-id");
+  if (!grantId) throw new Error("SUPPORT_GRANT_REQUIRED");
+  const snap = await adminDb().doc(`support_access_grants/${grantId}`).get();
+  const data = snap.data();
+  if (!snap.exists || data?.businessId !== businessId || data?.grantedTo !== admin.uid || data?.mode !== "read_only" || data?.revokedAt || new Date(data.expiresAt).getTime() <= Date.now()) throw new Error("SUPPORT_GRANT_INVALID");
+  await writePlatformAudit(admin, "support_access.read", businessId, { grantId });
+  return data;
+}
