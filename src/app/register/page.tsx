@@ -95,7 +95,7 @@ export default function Register() {
             )}
           </div>
         </div>
-        <p className="mt-4 text-center text-xs text-slate-400">By continuing you agree to the Terms of Service and Privacy Policy. Your business owns its data.</p>
+        <p className="mt-4 text-center text-xs text-slate-400">By continuing you agree to the <a href="/terms" className="underline">Terms</a> and <a href="/privacy" className="underline">Privacy Policy</a>. Your business owns its data.</p>
       </div>
     </div>
   );

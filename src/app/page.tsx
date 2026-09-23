@@ -115,7 +115,7 @@ export default function Landing() {
       </section>
 
       <footer className="border-t border-slate-100 py-8 text-center text-xs text-slate-400">
-        <div className="flex items-center justify-center gap-1"><MessageCircle size={14} /> Support via WhatsApp · Terms · Privacy · Botswana Data Protection Act compliant</div>
+        <div className="flex flex-wrap items-center justify-center gap-2"><MessageCircle size={14} /> Support via WhatsApp · <a href="/terms" className="underline">Terms</a> · <a href="/privacy" className="underline">Privacy</a> · <a href="/data-policy" className="underline">Data & retention</a> · <a href="/refunds" className="underline">Billing & refunds</a></div>
         <div className="mt-1">© {new Date().getFullYear()} KgweboOS</div>
       </footer>
     </div>
