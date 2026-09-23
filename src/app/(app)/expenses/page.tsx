@@ -3,6 +3,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Plus, Trash2, Camera, ScanLine } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useAuth } from "@/lib/firebase/AuthProvider";
 import { useEntitlements } from "@/lib/useEntitlements";
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from "@/lib/types";
 import { fmtDate, money, todayISO, isSameMonth } from "@/lib/utils";
@@ -16,8 +17,11 @@ export default function Page() {
 function Expenses() {
   const params = useSearchParams();
   const { expenses, addExpense, deleteExpense } = useStore();
+  const auth = useAuth();
   const ent = useEntitlements();
   const [open, setOpen] = useState(false);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [ocrBusy, setOcrBusy] = useState(false);
   const [f, setF] = useState({ category: "Other" as ExpenseCategory, amount: "", vendor: "", date: todayISO(), note: "", receiptUrl: "" });
   useEffect(() => { if (params.get("new")) setOpen(true); }, [params]);
 
@@ -28,13 +32,20 @@ function Expenses() {
     const file = e.target.files?.[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
+    setReceiptFile(file);
     setF((x) => ({ ...x, receiptUrl: url, vendor: x.vendor || file.name.replace(/\.[^.]+$/, "") }));
+  };
+
+  const runOcr = async () => {
+    if (!receiptFile || !auth.fbUser || !useStore.getState().business) return;
+    setOcrBusy(true);
+    try { const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(receiptFile); }); const token = await auth.fbUser.getIdToken(); const r = await fetch("/api/ocr/receipt", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ businessId: useStore.getState().business?.id, imageDataUrl: dataUrl, mimeType: receiptFile.type }) }); const d = await r.json(); if (!r.ok) { alert(d.error); return; } setF((x) => ({ ...x, amount: d.amount != null ? String(d.amount) : x.amount, vendor: d.vendor || x.vendor, date: d.date || x.date, note: `${x.note ? `${x.note} · ` : ""}OCR confidence ${Math.round((d.confidence ?? 0) * 100)}%` })); } catch { alert("Could not read receipt."); } finally { setOcrBusy(false); }
   };
 
   const submit = () => {
     if (!f.amount) return;
     addExpense({ ...f, amount: +f.amount });
-    setF({ category: "Other", amount: "", vendor: "", date: todayISO(), note: "", receiptUrl: "" });
+    setF({ category: "Other", amount: "", vendor: "", date: todayISO(), note: "", receiptUrl: "" }); setReceiptFile(null);
     setOpen(false);
   };
 
@@ -79,7 +90,7 @@ function Expenses() {
             <label className="btn-secondary w-full cursor-pointer"><Camera size={16} /> {f.receiptUrl ? "Receipt attached ✓" : "Attach / take photo"}<input type="file" accept="image/*" capture="environment" className="hidden" onChange={onReceipt} /></label>
           </Field>
           {ent.can("receipt_ocr") ? (
-            <button className="btn-ghost w-full text-xs" disabled={!f.receiptUrl} onClick={() => alert("Receipt OCR will read amount, vendor and date from the photo once the AI backend is connected.")}><ScanLine size={14} /> Auto-fill from receipt (OCR)</button>
+            <button className="btn-ghost w-full text-xs" disabled={!f.receiptUrl} onClick={() => void runOcr()}><ScanLine size={14} /> {ocrBusy ? "Reading receipt…" : "Auto-fill from receipt (OCR)"}</button>
           ) : (
             <div className="text-center text-xs text-slate-400">Receipt OCR auto-fill is a <UpgradePrompt inline reason="" /> feature</div>
           )}
