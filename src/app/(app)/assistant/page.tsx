@@ -16,7 +16,7 @@ export default function Assistant() {
   const [msgs, setMsgs] = useState<Msg[]>([{ role: "assistant", text: `Dumela! Ask me anything about ${store.business?.name}. I can read your invoices, expenses and stock.` }]);
   const [q, setQ] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
-  useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), [msgs]);
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
 
   const remaining = ent.remaining("ai_credits_per_month", ent.usage.ai_credits_per_month);
   const locked = remaining <= 0;

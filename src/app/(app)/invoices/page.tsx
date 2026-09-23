@@ -138,7 +138,7 @@ function NewDocModal({ open, onClose, defaultKind }: { open: boolean; onClose: (
   const [dueDays, setDueDays] = useState(7);
   const [recurring, setRecurring] = useState<"" | "monthly" | "weekly">("");
   const [notes, setNotes] = useState("");
-  useEffect(() => setKind(defaultKind), [defaultKind, open]);
+  useEffect(() => { setKind(defaultKind); }, [defaultKind, open]);
 
   const totals = invoiceTotals({ items }, vat);
   const limitHit = kind === "invoice" && !ent.withinLimit("invoices_per_month", ent.usage.invoices_per_month);

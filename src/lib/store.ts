@@ -348,7 +348,7 @@ export function useHydrated() {
   useEffect(() => {
     if (useStore.persist.hasHydrated()) setH(true);
     const unsub = useStore.persist.onFinishHydration(() => setH(true));
-    return unsub;
+    return () => { if (typeof unsub === "function") unsub(); };
   }, []);
   return h;
 }
