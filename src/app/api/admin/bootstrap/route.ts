@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
-import { adminConfigured } from "@/lib/firebase/admin";
+import { adminConfigured, adminDb } from "@/lib/firebase/admin";
 import type { AdminRole } from "@/lib/firebase/admin-auth";
 
 const roles: AdminRole[] = ["super_admin", "support", "billing", "compliance", "analyst"];
 export async function POST(request: Request) {
   if (!adminConfigured() || request.headers.get("x-bootstrap-secret") !== process.env.PLATFORM_BOOTSTRAP_SECRET) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  adminDb();
   const body = await request.json() as { email?: string; role?: AdminRole };
   if (!body.email || !body.role || !roles.includes(body.role)) return NextResponse.json({ error: "email and valid role are required" }, { status: 400 });
   try {

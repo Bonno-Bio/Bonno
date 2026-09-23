@@ -7,6 +7,7 @@ const LEVEL: Record<AdminRole, number> = { analyst: 1, support: 2, billing: 2, c
 
 export async function requirePlatformAdmin(request: Request, minimum: AdminRole = "analyst"): Promise<DecodedIdToken & { adminRole: AdminRole }> {
   if (!adminConfigured()) throw new Error("ADMIN_NOT_CONFIGURED");
+  adminDb();
   const header = request.headers.get("authorization");
   if (!header?.toLowerCase().startsWith("bearer ")) throw new Error("UNAUTHENTICATED");
   const token = await getAuth().verifyIdToken(header.slice(7));
