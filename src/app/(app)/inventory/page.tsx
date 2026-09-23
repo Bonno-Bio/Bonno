@@ -123,7 +123,7 @@ function POS() {
   const subtotal = items.reduce((s, x) => s + x.p.price * x.qty, 0);
   const total = +(subtotal * (1 + vat)).toFixed(2);
 
-  const checkout = (method: "cash" | "orange_money" | "card") => {
+  const checkout = (method: "cash" | "card" | "paypal") => {
     let walkIn = customers.find((c) => c.name === "Walk-in customer");
     if (!walkIn) walkIn = addCustomer({ name: "Walk-in customer" });
     const today = new Date().toISOString().slice(0, 10);
@@ -165,8 +165,8 @@ function POS() {
         <div className="mt-3 grid gap-2">
           <button className="btn-primary" disabled={!items.length} onClick={() => checkout("cash")}>Cash</button>
           <div className="grid grid-cols-2 gap-2">
-            <button className="btn-secondary" disabled={!items.length} onClick={() => checkout("orange_money")}>Orange Money</button>
-            <button className="btn-secondary" disabled={!items.length} onClick={() => checkout("card")}>Card</button>
+            <button className="btn-secondary" disabled={!items.length} onClick={() => checkout("card")}>Visa / card</button>
+            <button className="btn-secondary" disabled={!items.length} onClick={() => checkout("paypal")}>PayPal</button>
           </div>
         </div>
       </div>

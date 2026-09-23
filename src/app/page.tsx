@@ -52,7 +52,7 @@ export default function Landing() {
             Try the demo salon
           </button>
         </div>
-        <p className="mt-3 text-xs text-slate-400">No card needed · Pay with Orange Money, MyZaka, Smega, card or bank transfer</p>
+        <p className="mt-3 text-xs text-slate-400">No card needed for the trial · Upgrade securely with PayPal or Visa / Mastercard</p>
       </section>
 
       <section className="bg-slate-50 py-16">

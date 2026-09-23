@@ -55,7 +55,7 @@ interface State {
   loadDemo: () => void;
 
   // subscription
-  activatePremium: (provider: Subscription["provider"], ref: string, months?: number) => void;
+  activatePremium: (ref: string, months: number, interval: "monthly" | "annual", payerEmail?: string) => void;
   cancelPremium: () => void;
   simulateTrialEnd: () => void;
 
@@ -159,7 +159,7 @@ export const useStore = create<State>()(
             kind: "invoice", customerId: c1.id, status: "paid", issueDate: addDays(today, -12), dueDate: addDays(today, -5),
             items: [{ id: uid(), productId: p1.id, description: p1.name, qty: 1, unitPrice: 60, taxable: true }],
           });
-          st.recordPayment({ invoiceId: i1.id, amount: 68.4, method: "orange_money", reference: "OM-88213" });
+          st.recordPayment({ invoiceId: i1.id, amount: 68.4, method: "card", reference: "POS-88213" });
           st.addInvoice({
             kind: "invoice", customerId: c2.id, status: "sent", issueDate: addDays(today, -3), dueDate: addDays(today, 4),
             items: [
@@ -181,14 +181,14 @@ export const useStore = create<State>()(
           st.addExpense({ category: "Airtime & data", amount: 150, vendor: "Mascom", date: today });
         },
 
-        activatePremium: (provider, ref, months = 1) => {
+        activatePremium: (ref, months, interval, payerEmail) => {
           const sub = get().subscription;
           if (!sub) return;
           const base = sub.currentPeriodEnd && new Date(sub.currentPeriodEnd) > new Date() ? new Date(sub.currentPeriodEnd) : new Date();
           base.setDate(base.getDate() + 30 * months);
-          set({ subscription: { ...sub, plan: "premium", status: "active", currentPeriodEnd: base.toISOString(), provider, lastPaymentRef: ref, trialEndsAt: undefined } });
+          set({ subscription: { ...sub, plan: "premium", status: "active", currentPeriodEnd: base.toISOString(), provider: "paypal", interval, payerEmail, lastPaymentRef: ref, trialEndsAt: undefined } });
           get().log("subscription.activated", "subscription");
-          get().notify("Premium activated ✅", `Payment ${ref} confirmed. Premium is active until ${base.toLocaleDateString("en-GB")}.`);
+          get().notify("Premium activated ✅", `PayPal payment ${ref} confirmed. Premium is active until ${base.toLocaleDateString("en-GB")}.`);
         },
 
         cancelPremium: () => {

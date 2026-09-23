@@ -44,7 +44,9 @@ export interface Subscription {
   status: SubscriptionStatus;
   trialEndsAt?: string;
   currentPeriodEnd?: string;
-  provider?: "card" | "bank_transfer" | "orange_money" | "myzaka" | "smega";
+  provider?: "paypal";
+  interval?: "monthly" | "annual";
+  payerEmail?: string;
   lastPaymentRef?: string;
 }
 
@@ -109,7 +111,8 @@ export interface Invoice {
   createdAt: string;
 }
 
-export type PaymentMethod = "cash" | "card" | "bank_transfer" | "orange_money" | "myzaka" | "smega";
+/** How a business records that ITS customer paid an invoice (bookkeeping only). */
+export type PaymentMethod = "cash" | "card" | "paypal" | "bank_transfer" | "other";
 
 export interface Payment {
   id: ID;

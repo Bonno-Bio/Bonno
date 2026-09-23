@@ -10,7 +10,7 @@ src/app/            Next.js App Router
   register/         Onboarding wizard (3 steps, starts 14-day Premium trial)
   (app)/            Authenticated shell (sidebar + bottom nav, offline banner, notifications)
     dashboard, customers, invoices, expenses, inventory, reports, assistant, billing, settings
-  api/billing/webhook   Payment-provider webhook (signature check → activate subscription)
+  api/paypal/*      create-order, capture-order (server-verified), webhook (signature-verified)
 src/lib/
   plans.ts          SINGLE SOURCE OF TRUTH for prices, limits, feature flags, plan matrix
   entitlements.ts   Resolves trial / active / grace / expired → effective plan; can() / withinLimit()
@@ -44,12 +44,17 @@ The store persists to `localStorage` and records every mutation in `pendingOps`.
 (`src/lib/sync/supabase.ts`, next step) replays these against Supabase when online and reconciles by `id`.
 
 ## Billing flow
-register → trial → banner countdown → `/billing` → choose Orange Money / MyZaka / Smega / card / EFT
-→ provider → `POST /api/billing/webhook` → subscription active 30 days → reminder at T-3 → grace → downgrade.
+register → trial → banner countdown → `/billing` → `<PayPalCheckout>` (PayPal button or Visa/Mastercard card fields)
+→ `POST /api/paypal/create-order` (server, amount from `PRICING`) → buyer approves
+→ `POST /api/paypal/capture-order` (server captures, checks amount === expected) → client `activatePremium()`
+→ `POST /api/paypal/webhook` (PAYMENT.CAPTURE.COMPLETED / REFUNDED, signature-verified) reconciles the DB
+→ active 30/365 days → reminder at T-3 → 5-day grace → downgrade.
+
+Prices live in `plans.ts` (BWP) and are converted to USD in `lib/paypal/config.ts`.
 
 ## Next steps (Phase 1 → 3)
 1. Supabase Auth (email/phone OTP + 2FA) and the sync adapter.
-2. Real payment provider integration (Paygate/DPO) + webhook HMAC verification.
+2. Set `PAYPAL_CLIENT_SECRET` + `PAYPAL_WEBHOOK_ID`; persist captures to `payments_billing`.
 3. Background jobs: recurring invoices, T-3 reminders, overdue marking, monthly AI credit reset.
 4. LLM-backed assistant with per-tenant cost caps; receipt OCR.
 5. PostHog events: activation (first invoice), premium conversion, churn.

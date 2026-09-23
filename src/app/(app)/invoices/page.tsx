@@ -16,8 +16,8 @@ export default function Page() {
 }
 
 const METHODS: { id: PaymentMethod; label: string }[] = [
-  { id: "cash", label: "Cash" }, { id: "orange_money", label: "Orange Money" }, { id: "myzaka", label: "MyZaka" },
-  { id: "smega", label: "Smega" }, { id: "card", label: "Card" }, { id: "bank_transfer", label: "Bank transfer" },
+  { id: "cash", label: "Cash" }, { id: "card", label: "Visa / Mastercard" }, { id: "paypal", label: "PayPal" },
+  { id: "bank_transfer", label: "Bank transfer" }, { id: "other", label: "Other" },
 ];
 
 function Invoices() {
@@ -45,7 +45,7 @@ function Invoices() {
     const c = custById[i.customerId];
     const phone = c?.phone?.replace(/\D/g, "");
     const t = invoiceTotals(i, vat).total;
-    const msg = encodeURIComponent(`Dumela ${c?.name ?? ""}, friendly reminder from ${business?.name}: invoice ${i.number} for ${money(t)} was due ${fmtDate(i.dueDate)}. Pay via Orange Money/MyZaka/Smega. Thank you!`);
+    const msg = encodeURIComponent(`Dumela ${c?.name ?? ""}, friendly reminder from ${business?.name}: invoice ${i.number} for ${money(t)} was due ${fmtDate(i.dueDate)}. Thank you!`);
     window.open(`https://wa.me/${phone ?? ""}?text=${msg}`, "_blank");
     notify("Reminder sent", `WhatsApp reminder opened for ${i.number}.`);
   };
