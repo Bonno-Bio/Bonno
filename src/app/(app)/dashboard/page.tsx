@@ -7,7 +7,7 @@ import { invoiceTotals, isSameMonth, money, fmtDate, todayISO } from "@/lib/util
 import { PageHeader, StatusBadge } from "@/components/ui";
 
 export default function Dashboard() {
-  const { business, invoices, payments, expenses, customers, products } = useStore();
+  const { business, invoices, payments, expenses, customers, products, updatePayment } = useStore();
   const ent = useEntitlements();
   const vat = business?.vatRate ?? 0;
 
@@ -20,6 +20,7 @@ export default function Dashboard() {
   const upcomingExpenses = expenses.filter((e) => e.date >= today).sort((a, b) => a.date.localeCompare(b.date));
   const upcomingObligations = upcomingExpenses.reduce((s, e) => s + e.amount, 0);
   const safeToSpend = salesMonth - expMonth - upcomingObligations;
+  const pendingPayments = payments.filter((p) => p.verificationStatus === "pending");
   const lowStock = products.filter((p) => p.trackStock && p.stockQty <= p.lowStockThreshold);
   const recent = invoices.slice(0, 5);
   const custById = Object.fromEntries(customers.map((c) => [c.id, c]));
@@ -60,7 +61,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {(overdue.length > 0 || lowStock.length > 0 || upcomingExpenses.length > 0) && (
+      {(overdue.length > 0 || lowStock.length > 0 || upcomingExpenses.length > 0 || pendingPayments.length > 0) && (
         <div className="grid gap-3 md:grid-cols-2">
           {overdue.length > 0 && (
             <div className="card border-rose-200 bg-rose-50">
@@ -71,6 +72,12 @@ export default function Dashboard() {
                 ))}
               </ul>
               <Link href="/invoices" className="mt-2 inline-block text-xs text-rose-700 underline">Send reminders →</Link>
+            </div>
+          )}
+          {pendingPayments.length > 0 && (
+            <div className="card border-violet-200 bg-violet-50">
+              <div className="flex items-center gap-2 font-medium text-violet-800"><Wallet size={16} /> Payment proof to review</div>
+              <ul className="mt-2 space-y-2 text-sm">{pendingPayments.slice(0, 3).map((p) => <li key={p.id} className="rounded-lg bg-white/70 p-2"><div className="flex justify-between"><span>{custById[invoices.find((i) => i.id === p.invoiceId)?.customerId ?? ""]?.name ?? "Customer"}</span><span className="font-medium">{money(p.amount)}</span></div><div className="mt-1 flex gap-1"><button className="btn-secondary px-2 py-1 text-xs" onClick={() => updatePayment(p.id, { verificationStatus: "verified", verifiedAt: new Date().toISOString() })}>Verify</button><button className="btn-ghost px-2 py-1 text-xs text-rose-700" onClick={() => updatePayment(p.id, { verificationStatus: "rejected" })}>Reject</button></div></li>)}</ul>
             </div>
           )}
           {upcomingExpenses.length > 0 && (
