@@ -22,7 +22,7 @@ const METHODS: { id: PaymentMethod; label: string }[] = [
 
 function Invoices() {
   const params = useSearchParams();
-  const { invoices, customers, business, recordPayment, deleteInvoice, updateInvoice, convertQuoteToInvoice, notify } = useStore();
+  const { invoices, customers, business, recordPayment, addReminder, deleteInvoice, updateInvoice, convertQuoteToInvoice, notify } = useStore();
   const ent = useEntitlements();
   const [tab, setTab] = useState<DocKind>("invoice");
   const [open, setOpen] = useState(false);
@@ -46,8 +46,10 @@ function Invoices() {
     const phone = c?.phone?.replace(/\D/g, "");
     const t = invoiceTotals(i, vat).total;
     const msg = encodeURIComponent(`Dumela ${c?.name ?? ""}, friendly reminder from ${business?.name}: invoice ${i.number} for ${money(t)} was due ${fmtDate(i.dueDate)}. Thank you!`);
+    if (!c?.reminderConsent && c?.reminderConsent !== undefined) { notify("Reminder not sent", "This customer has not consented to reminders."); return; }
     window.open(`https://wa.me/${phone ?? ""}?text=${msg}`, "_blank");
-    notify("Reminder sent", `WhatsApp reminder opened for ${i.number}.`);
+    addReminder({ invoiceId: i.id, customerId: i.customerId, channel: "whatsapp", message: decodeURIComponent(msg), outcome: "opened" });
+    notify("Reminder recorded", `WhatsApp reminder opened for ${i.number}.`);
   };
 
   return (
@@ -112,9 +114,10 @@ function Invoices() {
   );
 }
 
-function PayForm({ inv, vat, onDone }: { inv: Invoice; vat: number; onDone: (m: PaymentMethod, ref: string) => void }) {
+function PayForm({ inv, vat, onDone }: { inv: Invoice; vat: number; onDone: (m: PaymentMethod, ref: string, proofUrl?: string) => void }) {
   const [m, setM] = useState<PaymentMethod>("cash");
   const [ref, setRef] = useState("");
+  const [proofUrl, setProofUrl] = useState("");
   return (
     <div className="space-y-3">
       <div className="text-2xl font-semibold">{money(invoiceTotals(inv, vat).total)}</div>
@@ -122,7 +125,8 @@ function PayForm({ inv, vat, onDone }: { inv: Invoice; vat: number; onDone: (m: 
         <div className="grid grid-cols-2 gap-2">{METHODS.map((x) => <button key={x.id} onClick={() => setM(x.id)} className={cn("rounded-xl border px-3 py-2 text-sm", m === x.id ? "border-emerald-600 bg-emerald-50 font-medium" : "border-slate-200")}>{x.label}</button>)}</div>
       </Field>
       <Field label="Reference (optional)"><input className="input" value={ref} onChange={(e) => setRef(e.target.value)} placeholder="e.g. OM-88213" /></Field>
-      <button className="btn-primary w-full" onClick={() => onDone(m, ref)}>Mark as paid</button>
+      <Field label="Payment proof link (optional)"><input className="input" value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} placeholder="Photo/receipt URL" /><p className="mt-1 text-[11px] text-slate-500">Proof is marked pending until reviewed.</p></Field>
+      <button className="btn-primary w-full" onClick={() => onDone(m, ref, proofUrl || undefined)}>Mark as paid</button>
     </div>
   );
 }

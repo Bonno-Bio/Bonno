@@ -55,8 +55,28 @@ export interface Customer {
   phone?: string;
   email?: string;
   notes?: string;
+  preferredReminderChannel?: "whatsapp" | "sms" | "email" | "phone";
+  reminderConsent?: boolean;
+  promiseToPayDate?: string;
+  promiseToPayNote?: string;
+  escalationLevel?: 0 | 1 | 2 | 3;
   createdAt: string;
 }
+
+export type ReminderChannel = "whatsapp" | "sms" | "email" | "phone";
+export interface CollectionReminder {
+  id: ID;
+  businessId: ID;
+  invoiceId: ID;
+  customerId: ID;
+  channel: ReminderChannel;
+  message: string;
+  sentAt: string;
+  outcome?: "opened" | "promised" | "paid" | "no_response";
+  nextReminderAt?: string;
+}
+
+export type PaymentVerificationStatus = "unverified" | "pending" | "verified" | "rejected";
 
 export interface Product {
   id: ID;
@@ -119,6 +139,9 @@ export interface Payment {
   amount: number;
   method: PaymentMethod;
   reference?: string;
+  proofUrl?: string;
+  verificationStatus?: PaymentVerificationStatus;
+  verifiedAt?: string;
   createdAt: string;
 }
 

@@ -12,6 +12,7 @@ import type {
   AuditLog,
   Business,
   Customer,
+  CollectionReminder,
   Expense,
   Invoice,
   Notification,
@@ -38,6 +39,7 @@ interface State {
   user: User | null;
   subscription: Subscription | null;
   customers: Customer[];
+  reminders: CollectionReminder[];
   products: Product[];
   stockMovements: StockMovement[];
   invoices: Invoice[];
@@ -62,6 +64,8 @@ interface State {
   // customers
   addCustomer: (c: Omit<Customer, "id" | "businessId" | "createdAt">) => Customer;
   updateCustomer: (id: string, patch: Partial<Customer>) => void;
+  addReminder: (r: Omit<CollectionReminder, "id" | "businessId" | "sentAt">) => CollectionReminder;
+  updateReminder: (id: string, patch: Partial<CollectionReminder>) => void;
   deleteCustomer: (id: string) => void;
 
   // products
@@ -76,6 +80,7 @@ interface State {
   updateInvoice: (id: string, patch: Partial<Invoice>) => void;
   deleteInvoice: (id: string) => void;
   recordPayment: (p: Omit<Payment, "id" | "businessId" | "createdAt">) => void;
+  updatePayment: (id: string, patch: Partial<Payment>) => void;
   convertQuoteToInvoice: (quoteId: string) => Invoice | null;
 
   // expenses
@@ -108,6 +113,7 @@ export const useStore = create<State>()(
         user: null,
         subscription: null,
         customers: [],
+        reminders: [],
         products: [],
         stockMovements: [],
         invoices: [],
@@ -136,7 +142,7 @@ export const useStore = create<State>()(
 
         signOut: () =>
           set({
-            business: null, user: null, subscription: null, customers: [], products: [], stockMovements: [],
+            business: null, user: null, subscription: null, customers: [], reminders: [], products: [], stockMovements: [],
             invoices: [], payments: [], expenses: [], auditLogs: [], notifications: [], pendingOps: [], aiCreditsUsed: 0,
           }),
 
@@ -217,6 +223,17 @@ export const useStore = create<State>()(
           push("customers", "delete", { id });
           get().log("customer.deleted", "customer", id);
         },
+        addReminder: (r) => {
+          const rec: CollectionReminder = { ...r, id: uid("rem"), businessId: bid(), sentAt: nowISO() };
+          set((s) => ({ reminders: [rec, ...s.reminders] }));
+          push("reminders", "insert", rec);
+          get().log("collection.reminder_sent", "reminder", rec.id);
+          return rec;
+        },
+        updateReminder: (id, patch) => {
+          set((s) => ({ reminders: s.reminders.map((r) => (r.id === id ? { ...r, ...patch } : r)) }));
+          push("reminders", "update", { id, ...patch });
+        },
 
         addProduct: (p) => {
           const rec: Product = { ...p, id: uid("prd"), businessId: bid(), createdAt: nowISO() };
@@ -277,11 +294,16 @@ export const useStore = create<State>()(
           push("invoices", "delete", { id });
         },
         recordPayment: (p) => {
-          const rec: Payment = { ...p, id: uid("pay"), businessId: bid(), createdAt: nowISO() };
+          const rec: Payment = { ...p, id: uid("pay"), businessId: bid(), verificationStatus: p.verificationStatus ?? "verified", createdAt: nowISO() };
           set((s) => ({ payments: [rec, ...s.payments] }));
           push("payments", "insert", rec);
           get().updateInvoice(p.invoiceId, { status: "paid" });
           get().log("payment.recorded", "payment", rec.id);
+        },
+        updatePayment: (id, patch) => {
+          set((s) => ({ payments: s.payments.map((p) => (p.id === id ? { ...p, ...patch } : p)) }));
+          push("payments", "update", { id, ...patch });
+          get().log("payment.verification_updated", "payment", id);
         },
         convertQuoteToInvoice: (quoteId) => {
           const q = get().invoices.find((i) => i.id === quoteId && i.kind === "quote");

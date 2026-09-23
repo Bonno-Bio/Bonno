@@ -1,7 +1,7 @@
 "use client";
 import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { Plus, Search, Phone, Mail, Trash2, MessageCircle } from "lucide-react";
+import { Plus, Search, Phone, Mail, Trash2, MessageCircle, CalendarClock, History } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useEntitlements } from "@/lib/useEntitlements";
 import { invoiceTotals, money } from "@/lib/utils";
@@ -15,10 +15,11 @@ export default function Page() {
 
 function Customers() {
   const params = useSearchParams();
-  const { customers, invoices, business, addCustomer, deleteCustomer } = useStore();
+  const { customers, invoices, business, addCustomer, updateCustomer, deleteCustomer, reminders } = useStore();
   const ent = useEntitlements();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const [manage, setManage] = useState<(typeof customers)[number] | null>(null);
   const [f, setF] = useState({ name: "", phone: "", email: "", notes: "" });
 
   useEffect(() => { if (params.get("new")) setOpen(true); }, [params]);
@@ -68,6 +69,7 @@ function Customers() {
                   {o > 0 ? <div className="text-sm font-medium text-amber-700">{money(o)} owed</div> : <div className="text-xs text-slate-400">Settled</div>}
                   <div className="mt-1 flex justify-end gap-1">
                     {wa && <a className="btn-ghost p-1.5" href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" title="WhatsApp"><MessageCircle size={16} /></a>}
+                    <button className="btn-ghost p-1.5" onClick={() => setManage(c)} title="Collections"><CalendarClock size={16} /></button>
                     <button className="btn-ghost p-1.5 text-rose-600" onClick={() => confirm(`Delete ${c.name}?`) && deleteCustomer(c.id)}><Trash2 size={16} /></button>
                   </div>
                 </div>
@@ -76,6 +78,10 @@ function Customers() {
           })}
         </ul>
       )}
+
+      <Modal open={!!manage} onClose={() => setManage(null)} title={`Collections · ${manage?.name ?? ""}`}>
+        {manage && <CollectionPanel customer={manage} reminders={reminders.filter((r) => r.customerId === manage.id)} onSave={(patch) => { updateCustomer(manage.id, patch); setManage({ ...manage, ...patch }); }} />}
+      </Modal>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Add customer">
         {!canAdd ? (
@@ -92,4 +98,23 @@ function Customers() {
       </Modal>
     </div>
   );
+}
+
+
+function CollectionPanel({ customer, reminders, onSave }: { customer: { id: string; phone?: string; email?: string; preferredReminderChannel?: "whatsapp" | "sms" | "email" | "phone"; reminderConsent?: boolean; promiseToPayDate?: string; promiseToPayNote?: string; escalationLevel?: 0 | 1 | 2 | 3 }; reminders: { id: string; channel: string; sentAt: string; outcome?: string }[]; onSave: (patch: Record<string, unknown>) => void }) {
+  const [channel, setChannel] = useState(customer.preferredReminderChannel ?? "whatsapp");
+  const [consent, setConsent] = useState(customer.reminderConsent ?? true);
+  const [promise, setPromise] = useState(customer.promiseToPayDate ?? "");
+  const [note, setNote] = useState(customer.promiseToPayNote ?? "");
+  const [level, setLevel] = useState(customer.escalationLevel ?? 0);
+  const save = () => onSave({ preferredReminderChannel: channel, reminderConsent: consent, promiseToPayDate: promise || undefined, promiseToPayNote: note || undefined, escalationLevel: level });
+  return <div className="space-y-4">
+    <div className="rounded-xl bg-slate-50 p-3 text-sm"><div className="font-medium">Collection preferences</div><p className="mt-1 text-xs text-slate-500">Choose a respectful channel and record consent before sending automated reminders.</p></div>
+    <Field label="Preferred reminder channel"><select className="input" value={channel} onChange={(e) => setChannel(e.target.value as typeof channel)}><option value="whatsapp">WhatsApp</option><option value="sms">SMS</option><option value="email">Email</option><option value="phone">Phone call</option></select></Field>
+    <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} /> Customer has agreed to payment reminders</label>
+    <div className="grid gap-3 sm:grid-cols-2"><Field label="Promise-to-pay date"><input className="input" type="date" value={promise} onChange={(e) => setPromise(e.target.value)} /></Field><Field label="Escalation stage"><select className="input" value={level} onChange={(e) => setLevel(Number(e.target.value) as 0 | 1 | 2 | 3)}><option value={0}>Friendly · first reminder</option><option value={1}>Second reminder</option><option value={2}>Manager follow-up</option><option value={3}>Formal escalation</option></select></Field></div>
+    <Field label="Promise-to-pay note"><textarea className="input min-h-20" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Will pay after month-end stock sale" /></Field>
+    <button className="btn-primary w-full" onClick={save}>Save collection plan</button>
+    <div><h3 className="flex items-center gap-2 text-sm font-medium"><History size={15} /> Reminder history</h3>{reminders.length ? <ul className="mt-2 divide-y divide-slate-100 text-xs">{reminders.slice(0, 8).map((r) => <li key={r.id} className="flex justify-between py-2"><span>{r.channel} reminder{r.outcome ? ` · ${r.outcome}` : ""}</span><span className="text-slate-400">{new Date(r.sentAt).toLocaleDateString("en-GB")}</span></li>)}</ul> : <p className="mt-2 text-xs text-slate-400">No reminders recorded yet.</p>}</div>
+  </div>;
 }

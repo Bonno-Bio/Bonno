@@ -18,7 +18,7 @@ import { useStore, type PendingOp } from "../store";
 import type { Business, Subscription, User } from "../types";
 
 const ENTITY_TO_KEY: Record<string, StoreCollectionKey> = {
-  customers: "customers", products: "products", stock_movements: "stockMovements", invoices: "invoices",
+  customers: "customers", reminders: "reminders", products: "products", stock_movements: "stockMovements", invoices: "invoices",
   payments: "payments", expenses: "expenses", audit_logs: "auditLogs",
 };
 

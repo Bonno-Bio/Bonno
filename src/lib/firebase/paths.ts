@@ -10,6 +10,7 @@ export const P = {
 /** store key → Firestore sub-collection */
 export const COLLECTIONS = {
   customers: "customers",
+  reminders: "reminders",
   products: "products",
   stockMovements: "stock_movements",
   invoices: "invoices",
