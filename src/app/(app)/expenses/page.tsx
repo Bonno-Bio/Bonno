@@ -4,6 +4,8 @@ import { useSearchParams } from "next/navigation";
 import { Plus, Trash2, Camera, ScanLine } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/firebase/AuthProvider";
+import { isFirebaseConfigured } from "@/lib/firebase/client";
+import { uploadBusinessDocument } from "@/lib/firebase/storage";
 import { useEntitlements } from "@/lib/useEntitlements";
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from "@/lib/types";
 import { fmtDate, money, todayISO, isSameMonth } from "@/lib/utils";
@@ -21,6 +23,8 @@ function Expenses() {
   const ent = useEntitlements();
   const [open, setOpen] = useState(false);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptStoragePath, setReceiptStoragePath] = useState("");
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [f, setF] = useState({ category: "Other" as ExpenseCategory, amount: "", vendor: "", date: todayISO(), note: "", receiptUrl: "" });
   useEffect(() => { if (params.get("new")) setOpen(true); }, [params]);
@@ -33,7 +37,10 @@ function Expenses() {
     if (!file) return;
     const url = URL.createObjectURL(file);
     setReceiptFile(file);
+    setReceiptStoragePath("");
     setF((x) => ({ ...x, receiptUrl: url, vendor: x.vendor || file.name.replace(/\.[^.]+$/, "") }));
+    const bid = useStore.getState().business?.id;
+    if (isFirebaseConfigured && auth.fbUser && bid) { setUploadingReceipt(true); void uploadBusinessDocument(bid, file).then((result) => { setF((x) => ({ ...x, receiptUrl: result.url })); setReceiptStoragePath(result.storagePath); }).catch(() => undefined).finally(() => setUploadingReceipt(false)); }
   };
 
   const runOcr = async () => {
@@ -44,8 +51,8 @@ function Expenses() {
 
   const submit = () => {
     if (!f.amount) return;
-    addExpense({ ...f, amount: +f.amount });
-    setF({ category: "Other", amount: "", vendor: "", date: todayISO(), note: "", receiptUrl: "" }); setReceiptFile(null);
+    addExpense({ ...f, amount: +f.amount, receiptStoragePath: receiptStoragePath || undefined, retentionUntil: f.receiptUrl ? new Date(new Date().setFullYear(new Date().getFullYear() + 7)).toISOString() : undefined });
+    setF({ category: "Other", amount: "", vendor: "", date: todayISO(), note: "", receiptUrl: "" }); setReceiptFile(null); setReceiptStoragePath("");
     setOpen(false);
   };
 
@@ -87,14 +94,14 @@ function Expenses() {
             <Field label="Note"><input className="input" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} /></Field>
           </div>
           <Field label="Receipt photo">
-            <label className="btn-secondary w-full cursor-pointer"><Camera size={16} /> {f.receiptUrl ? "Receipt attached ✓" : "Attach / take photo"}<input type="file" accept="image/*" capture="environment" className="hidden" onChange={onReceipt} /></label>
+            <label className="btn-secondary w-full cursor-pointer"><Camera size={16} /> {uploadingReceipt ? "Uploading receipt…" : f.receiptUrl ? "Receipt attached ✓" : "Attach / take photo"}<input type="file" accept="image/*" capture="environment" className="hidden" onChange={onReceipt} /></label>
           </Field>
           {ent.can("receipt_ocr") ? (
             <button className="btn-ghost w-full text-xs" disabled={!f.receiptUrl} onClick={() => void runOcr()}><ScanLine size={14} /> {ocrBusy ? "Reading receipt…" : "Auto-fill from receipt (OCR)"}</button>
           ) : (
             <div className="text-center text-xs text-slate-400">Receipt OCR auto-fill is a <UpgradePrompt inline reason="" /> feature</div>
           )}
-          <button className="btn-primary w-full" onClick={submit} disabled={!f.amount}>Save expense</button>
+          <button className="btn-primary w-full" onClick={submit} disabled={!f.amount || uploadingReceipt}>Save expense</button>
         </div>
       </Modal>
     </div>

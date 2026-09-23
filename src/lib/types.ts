@@ -190,6 +190,8 @@ export interface Expense {
   date: string;
   note?: string;
   receiptUrl?: string;
+  receiptStoragePath?: string;
+  retentionUntil?: string;
   createdAt: string;
 }
 
