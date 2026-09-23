@@ -12,5 +12,5 @@ export async function GET(request: Request) {
       return { id: d.id, ...d.data(), subscription: sub.exists ? sub.data() : { plan: "free", status: "free" }, memberCount: members.size };
     }));
     return NextResponse.json({ businesses: rows });
-  } catch (e) { return NextResponse.json({ error: e instanceof Error && e.message === "FORBIDDEN" ? "Forbidden" : "Admin service unavailable" }, { status: e instanceof Error && e.message === "FORBIDDEN" ? 403 : 401 }); }
+  } catch (e) { return NextResponse.json({ error: e instanceof Error && e.message === "FORBIDDEN" ? "Forbidden" : e instanceof Error && e.message === "MFA_REQUIRED" ? "MFA required" : "Admin service unavailable" }, { status: e instanceof Error && (e.message === "FORBIDDEN" || e.message === "MFA_REQUIRED") ? 403 : 401 }); }
 }

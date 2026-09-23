@@ -13,6 +13,7 @@ export async function requirePlatformAdmin(request: Request, minimum: AdminRole 
   const token = await getAuth().verifyIdToken(header.slice(7));
   const role = token.adminRole as AdminRole | undefined;
   if (token.platformAdmin !== true || !role || LEVEL[role] < LEVEL[minimum]) throw new Error("FORBIDDEN");
+  if (!token.firebase?.sign_in_second_factor) throw new Error("MFA_REQUIRED");
   return { ...token, adminRole: role };
 }
 
