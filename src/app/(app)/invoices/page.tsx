@@ -1,8 +1,9 @@
 "use client";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Plus, Trash2, Printer, MessageCircle, CheckCircle2, ArrowRightLeft, Repeat, Download, FilePlus2 } from "lucide-react";
+import { Plus, Trash2, Printer, MessageCircle, CheckCircle2, ArrowRightLeft, Repeat, Download, FilePlus2, FileText } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useAuth } from "@/lib/firebase/AuthProvider";
 import { useEntitlements } from "@/lib/useEntitlements";
 import { addDays, fmtDate, invoiceTotals, money, todayISO, uid } from "@/lib/utils";
 import type { DocKind, Invoice, LineItem, PaymentMethod } from "@/lib/types";
@@ -236,6 +237,8 @@ function NewDocModal({ open, onClose, defaultKind }: { open: boolean; onClose: (
   );
 }
 
+function ServerPdfButton({ invoiceId, businessId, number }: { invoiceId: string; businessId: string; number: string }) { const { fbUser, mode } = useAuth(); return <button className="btn-primary" onClick={async () => { if (mode !== "firebase" || !fbUser) { alert("Connect Firebase to generate a server PDF. Print fallback is available locally."); return; } const token = await fbUser.getIdToken(); const r = await fetch(`/api/documents/invoices/${invoiceId}/pdf?businessId=${encodeURIComponent(businessId)}`, { headers: { Authorization: `Bearer ${token}` } }); if (!r.ok) { alert("Could not generate PDF."); return; } const blob = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${number}.pdf`; a.click(); URL.revokeObjectURL(a.href); }}><FileText size={16} /> Server PDF</button>; }
+
 function DocPreview({ inv }: { inv: Invoice }) {
   const { business, customers, payments } = useStore();
   const ent = useEntitlements();
@@ -277,7 +280,7 @@ function DocPreview({ inv }: { inv: Invoice }) {
         {inv.notes && <div className="mt-4 text-xs text-slate-500">{inv.notes}</div>}
         <div className="mt-6 text-center text-[10px] text-slate-400">{ent.can("custom_branding") ? "" : "Generated with KgweboOS · kgwebo.os"}</div>
       </div>
-      <button className="btn-primary mt-3 w-full" onClick={() => window.print()}><Printer size={16} /> Print / Save as PDF</button>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2"><button className="btn-secondary" onClick={() => window.print()}><Printer size={16} /> Print fallback</button><ServerPdfButton invoiceId={inv.id} businessId={business?.id ?? ""} number={inv.number} /></div>
       <style jsx global>{`@media print { body * { visibility: hidden; } #print-doc, #print-doc * { visibility: visible; } #print-doc { position: fixed; inset: 0; border: 0; } }`}</style>
     </div>
   );

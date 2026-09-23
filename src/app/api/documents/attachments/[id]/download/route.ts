@@ -1,0 +1,6 @@
+import { NextResponse } from "next/server";
+import { getStorage } from "firebase-admin/storage";
+import { adminDb } from "@/lib/firebase/admin";
+import { requireBusinessMember } from "@/lib/firebase/admin-auth";
+export const runtime = "nodejs";
+export async function GET(request: Request, context: { params: { id: string } }) { const bid = new URL(request.url).searchParams.get("businessId"); if (!bid) return NextResponse.json({ error: "businessId is required" }, { status: 400 }); try { await requireBusinessMember(request, bid); const invs = await adminDb().collection(`businesses/${bid}/invoices`).get(); const invoice = invs.docs.find(d => (d.data().attachments ?? []).some((a: {id:string}) => a.id === context.params.id)); const attachment = invoice?.data().attachments?.find((a: {id:string}) => a.id === context.params.id); if (!attachment?.storagePath) return NextResponse.json({ error: "Attachment not found" }, { status: 404 }); const [url] = await getStorage().bucket().file(attachment.storagePath).getSignedUrl({ action: "read", expires: Date.now() + 15 * 60 * 1000 }); return NextResponse.redirect(url); } catch { return NextResponse.json({ error: "Attachment service unavailable" }, { status: 403 }); } }

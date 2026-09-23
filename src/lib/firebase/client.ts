@@ -7,6 +7,7 @@
  */
 import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
+import { getStorage, type FirebaseStorage } from "firebase/storage";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, type Firestore } from "firebase/firestore";
 
 const config = {
@@ -23,6 +24,7 @@ export const isFirebaseConfigured = Boolean(config.apiKey && config.projectId &&
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
+let storageClient: FirebaseStorage | null = null;
 
 export function firebaseApp(): FirebaseApp {
   if (!isFirebaseConfigured) throw new Error("Firebase is not configured");
@@ -33,6 +35,11 @@ export function firebaseApp(): FirebaseApp {
 export function firebaseAuth(): Auth {
   if (!auth) auth = getAuth(firebaseApp());
   return auth;
+}
+
+export function firebaseStorage(): FirebaseStorage {
+  if (!storageClient) storageClient = getStorage(firebaseApp());
+  return storageClient;
 }
 
 export function firestore(): Firestore {

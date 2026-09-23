@@ -33,3 +33,14 @@ export async function requireSupportGrant(request: Request, admin: DecodedIdToke
   await writePlatformAudit(admin, "support_access.read", businessId, { grantId });
   return data;
 }
+
+export async function requireBusinessMember(request: Request, businessId: string) {
+  if (!adminConfigured()) throw new Error("ADMIN_NOT_CONFIGURED");
+  adminDb();
+  const header = request.headers.get("authorization");
+  if (!header?.toLowerCase().startsWith("bearer ")) throw new Error("UNAUTHENTICATED");
+  const token = await getAuth().verifyIdToken(header.slice(7));
+  const member = await adminDb().doc(`businesses/${businessId}/members/${token.uid}`).get();
+  if (!member.exists) throw new Error("FORBIDDEN");
+  return { token, role: member.data()?.role as string };
+}

@@ -10,6 +10,7 @@ import type { Role } from "@/lib/types";
 import { syncBridge } from "@/lib/firebase/bridge";
 import { createInvite } from "@/lib/firebase/invites";
 import { useAuth } from "@/lib/firebase/AuthProvider";
+import { uploadBusinessDocument } from "@/lib/firebase/storage";
 
 const ROLES: { id: Role; label: string; desc: string; premium?: boolean }[] = [
   { id: "owner", label: "Owner / Admin", desc: "Full access incl. billing" },
@@ -24,12 +25,14 @@ export default function Settings() {
   const { business, user, auditLogs, approvals, pendingOps, resolveApproval } = useStore();
   const ent = useEntitlements();
   const auth = useAuth();
-  const [b, setB] = useState({ name: business?.name ?? "", phone: business?.phone ?? "", email: business?.email ?? "", address: business?.address ?? "", vatNumber: business?.vatNumber ?? "", cipaNumber: business?.cipaNumber ?? "", tradeLicenseNumber: business?.tradeLicenseNumber ?? "", taxClearanceExpiry: business?.taxClearanceExpiry ?? "", vat: (business?.vatRate ?? 0) > 0 });
+  const [b, setB] = useState({ name: business?.name ?? "", phone: business?.phone ?? "", email: business?.email ?? "", address: business?.address ?? "", vatNumber: business?.vatNumber ?? "", cipaNumber: business?.cipaNumber ?? "", tradeLicenseNumber: business?.tradeLicenseNumber ?? "", taxClearanceExpiry: business?.taxClearanceExpiry ?? "", logoUrl: business?.logoUrl ?? "", brandColor: business?.brandColor ?? "#047857", vat: (business?.vatRate ?? 0) > 0 });
   const [invite, setInvite] = useState({ email: "", role: "manager" as Role });
   const [saved, setSaved] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const save = () => {
-    useStore.setState({ business: { ...business!, name: b.name, phone: b.phone, email: b.email, address: b.address, vatNumber: b.vat ? b.vatNumber : undefined, cipaNumber: b.cipaNumber || undefined, tradeLicenseNumber: b.tradeLicenseNumber || undefined, taxClearanceExpiry: b.taxClearanceExpiry || undefined, vatRate: b.vat ? 0.14 : 0 } });
+    useStore.setState({ business: { ...business!, name: b.name, phone: b.phone, email: b.email, address: b.address, vatNumber: b.vat ? b.vatNumber : undefined, cipaNumber: b.cipaNumber || undefined, tradeLicenseNumber: b.tradeLicenseNumber || undefined, taxClearanceExpiry: b.taxClearanceExpiry || undefined, logoUrl: b.logoUrl || undefined, brandColor: b.brandColor || undefined, vatRate: b.vat ? 0.14 : 0 } });
     useStore.getState().log("business.updated", "business", business?.id);
     syncBridge.onBusinessUpdated?.(useStore.getState().business!);
     setSaved(true); setTimeout(() => setSaved(false), 1500);
@@ -90,7 +93,7 @@ export default function Settings() {
 
       <section className="card space-y-2">
         <h2 className="font-semibold">Branding {!ent.can("custom_branding") && "🔒"}</h2>
-        {ent.can("custom_branding") ? <p className="text-sm text-slate-500">Upload your logo and choose colours for invoices. (Logo upload connects to object storage.)</p> : <p className="text-sm text-slate-500">Remove &quot;Generated with KgweboOS&quot; from invoices and add your logo with <UpgradePrompt inline reason="" />.</p>}
+        {ent.can("custom_branding") ? <div className="space-y-3"><p className="text-sm text-slate-500">Upload your logo and choose the colour used on server-generated PDFs.</p><div className="flex gap-2"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)} /><input className="h-10 w-14 rounded border" type="color" value={b.brandColor} onChange={(e) => setB({ ...b, brandColor: e.target.value })} /></div><button className="btn-secondary" disabled={!logoFile || uploadingLogo || !business} onClick={async () => { if (!logoFile || !business) return; setUploadingLogo(true); const result = await uploadBusinessDocument(business.id, logoFile); setB({ ...b, logoUrl: result.url }); setUploadingLogo(false); }}> {uploadingLogo ? "Uploading…" : "Upload logo"}</button>{b.logoUrl && <img src={b.logoUrl} alt="Business logo" className="h-12 max-w-32 object-contain" />}<button className="btn-primary" onClick={save}>{saved ? "Saved ✓" : "Save branding"}</button></div> : <p className="text-sm text-slate-500">Remove &quot;Generated with KgweboOS&quot; from invoices and add your logo with <UpgradePrompt inline reason="" />.</p>}
       </section>
 
       <section className="card">

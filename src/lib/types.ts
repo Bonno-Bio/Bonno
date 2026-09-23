@@ -28,6 +28,8 @@ export interface Business {
   cipaNumber?: string;
   tradeLicenseNumber?: string;
   taxClearanceExpiry?: string;
+  logoUrl?: string;
+  brandColor?: string;
   currency: "BWP";
   createdAt: string;
 }
@@ -114,6 +116,8 @@ export interface DocumentAttachment {
   id: ID;
   name: string;
   url: string;
+  storagePath?: string;
+  retentionUntil?: string;
   addedAt: string;
 }
 
