@@ -1,10 +1,10 @@
 "use client";
 import Link from "next/link";
-import { Plus, FileText, Users, Receipt, Package, AlertTriangle, Sparkles } from "lucide-react";
+import { Plus, FileText, Users, Receipt, Package, AlertTriangle, Sparkles, ArrowDownToLine, ArrowUpFromLine, Wallet, Clock3 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useEntitlements } from "@/lib/useEntitlements";
-import { invoiceTotals, isSameMonth, money, fmtDate } from "@/lib/utils";
-import { PageHeader, Stat, StatusBadge } from "@/components/ui";
+import { invoiceTotals, isSameMonth, money, fmtDate, todayISO } from "@/lib/utils";
+import { PageHeader, StatusBadge } from "@/components/ui";
 
 export default function Dashboard() {
   const { business, invoices, payments, expenses, customers, products } = useStore();
@@ -13,8 +13,13 @@ export default function Dashboard() {
 
   const salesMonth = payments.filter((p) => isSameMonth(p.createdAt)).reduce((s, p) => s + p.amount, 0);
   const expMonth = expenses.filter((e) => isSameMonth(e.date)).reduce((s, e) => s + e.amount, 0);
-  const outstanding = invoices.filter((i) => i.kind === "invoice" && (i.status === "sent" || i.status === "overdue")).reduce((s, i) => s + invoiceTotals(i, vat).total, 0);
+  const outstandingInvoices = invoices.filter((i) => i.kind === "invoice" && (i.status === "sent" || i.status === "overdue"));
+  const outstanding = outstandingInvoices.reduce((s, i) => s + invoiceTotals(i, vat).total, 0);
   const overdue = invoices.filter((i) => i.kind === "invoice" && i.status === "overdue");
+  const today = todayISO();
+  const upcomingExpenses = expenses.filter((e) => e.date >= today).sort((a, b) => a.date.localeCompare(b.date));
+  const upcomingObligations = upcomingExpenses.reduce((s, e) => s + e.amount, 0);
+  const safeToSpend = salesMonth - expMonth - upcomingObligations;
   const lowStock = products.filter((p) => p.trackStock && p.stockQty <= p.lowStockThreshold);
   const recent = invoices.slice(0, 5);
   const custById = Object.fromEntries(customers.map((c) => [c.id, c]));
@@ -30,12 +35,20 @@ export default function Dashboard() {
     <div className="space-y-5">
       <PageHeader title={`Dumela, ${useStore.getState().user?.name.split(" ")[0] ?? ""} 👋`} subtitle={`Here's how ${business?.name} is doing this month.`} />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Sales this month" value={money(salesMonth)} tone="good" />
-        <Stat label="Expenses this month" value={money(expMonth)} tone="bad" />
-        <Stat label="Profit (cash)" value={money(salesMonth - expMonth)} tone={salesMonth - expMonth >= 0 ? "good" : "bad"} />
-        <Stat label="Outstanding" value={money(outstanding)} hint={`${overdue.length} overdue`} tone={overdue.length ? "warn" : "default"} />
-      </div>
+      <section aria-labelledby="money-clarity" className="space-y-3">
+        <div className="flex items-center justify-between"><div><h2 id="money-clarity" className="text-lg font-semibold">Money clarity</h2><p className="text-xs text-slate-500">The numbers that matter before you make your next decision.</p></div><span className="badge bg-emerald-50 text-emerald-700">This month</span></div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <ClarityCard label="Cash in" value={money(salesMonth)} detail="Payments received" tone="good" icon={ArrowDownToLine} />
+          <ClarityCard label="Cash out" value={money(expMonth)} detail="Recorded expenses" tone="bad" icon={ArrowUpFromLine} />
+          <ClarityCard label="Amount owed" value={money(outstanding)} detail={`${outstandingInvoices.length} unpaid invoice${outstandingInvoices.length === 1 ? "" : "s"}`} tone={outstanding ? "warn" : "good"} icon={Clock3} />
+          <ClarityCard label="Overdue customers" value={String(overdue.length)} detail={overdue.length ? "Need a follow-up" : "Nothing overdue"} tone={overdue.length ? "bad" : "good"} icon={AlertTriangle} />
+          <div className={`col-span-2 rounded-2xl border p-4 lg:col-span-1 ${safeToSpend >= 0 ? "border-emerald-200 bg-emerald-50" : "border-rose-200 bg-rose-50"}`}>
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-600"><Wallet size={15} /> Safe to spend</div>
+            <div className={`mt-2 text-xl font-bold ${safeToSpend >= 0 ? "text-emerald-800" : "text-rose-800"}`}>{money(safeToSpend)}</div>
+            <p className="mt-1 text-[11px] text-slate-600">Cash in − cash out − upcoming obligations</p>
+          </div>
+        </div>
+      </section>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {quick.map((q) => (
@@ -47,7 +60,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {(overdue.length > 0 || lowStock.length > 0) && (
+      {(overdue.length > 0 || lowStock.length > 0 || upcomingExpenses.length > 0) && (
         <div className="grid gap-3 md:grid-cols-2">
           {overdue.length > 0 && (
             <div className="card border-rose-200 bg-rose-50">
@@ -58,6 +71,13 @@ export default function Dashboard() {
                 ))}
               </ul>
               <Link href="/invoices" className="mt-2 inline-block text-xs text-rose-700 underline">Send reminders →</Link>
+            </div>
+          )}
+          {upcomingExpenses.length > 0 && (
+            <div className="card border-sky-200 bg-sky-50">
+              <div className="flex items-center gap-2 font-medium text-sky-800"><Clock3 size={16} /> Upcoming obligations</div>
+              <ul className="mt-2 space-y-1 text-sm">{upcomingExpenses.slice(0, 3).map((e) => <li key={e.id} className="flex justify-between"><span>{e.vendor || e.category} · {fmtDate(e.date)}</span><span className="font-medium">{money(e.amount)}</span></li>)}</ul>
+              <Link href="/expenses?new=1" className="mt-2 inline-block text-xs text-sky-700 underline">Record an obligation →</Link>
             </div>
           )}
           {lowStock.length > 0 && (
@@ -104,6 +124,12 @@ export default function Dashboard() {
       </div>
     </div>
   );
+}
+
+function ClarityCard({ label, value, detail, tone, icon: Icon }: { label: string; value: string; detail: string; tone: "good" | "bad" | "warn"; icon: typeof Wallet }) {
+  const colors = { good: "border-emerald-100 bg-white", bad: "border-rose-100 bg-white", warn: "border-amber-100 bg-white" };
+  const iconColors = { good: "bg-emerald-50 text-emerald-700", bad: "bg-rose-50 text-rose-700", warn: "bg-amber-50 text-amber-700" };
+  return <div className={`rounded-2xl border p-4 ${colors[tone]}`}><div className="flex items-center gap-2 text-xs font-medium text-slate-600"><span className={`flex h-7 w-7 items-center justify-center rounded-lg ${iconColors[tone]}`}><Icon size={15} /></span>{label}</div><div className="mt-2 text-xl font-bold text-slate-900">{value}</div><p className="mt-1 text-[11px] text-slate-500">{detail}</p></div>;
 }
 
 function Usage({ label, used, limit }: { label: string; used: number; limit: number }) {
