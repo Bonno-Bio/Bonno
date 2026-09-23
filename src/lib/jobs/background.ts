@@ -84,7 +84,7 @@ async function generateRecurring(biz: DocumentReference, invoices: QuerySnapshot
     const key = `rec_${d.id}_${next.toISOString().slice(0, 10)}`;
     const ref = biz.collection("invoices").doc(key);
     if ((await ref.get()).exists) { result.skipped++; continue; }
-    await ref.create({ ...x, id: key, number: `${x.number}-R${next.toISOString().slice(0, 10).replaceAll("-", "")}`, issueDate: now.toISOString().slice(0, 10), dueDate: next.toISOString().slice(0, 10), status: "sent", recurringFromId: d.id, createdAt: now.toISOString(), updatedAt: FieldValue.serverTimestamp() });
+    await ref.create({ ...x, id: key, number: `${x.number}-R${next.toISOString().slice(0, 10).replaceAll("-", "")}`, issueDate: now.toISOString().slice(0, 10), dueDate: next.toISOString().slice(0, 10), status: "sent", recurring: null, recurringFromId: d.id, createdAt: now.toISOString(), updatedAt: FieldValue.serverTimestamp() });
     await d.ref.update({ dueDate: next.toISOString().slice(0, 10), lastGeneratedAt: now.toISOString(), updatedAt: FieldValue.serverTimestamp() });
     result.changed++;
   }
