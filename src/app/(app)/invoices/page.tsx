@@ -164,7 +164,7 @@ function NewDocModal({ open, onClose, defaultKind }: { open: boolean; onClose: (
     if (!cid && newCust) cid = addCustomer({ name: newCust }).id;
     if (!cid) return;
     const today = todayISO();
-    addInvoice({ kind, customerId: cid, items: items.filter((i) => i.description), issueDate: today, dueDate: addDays(today, dueDays), status, notes, discountAmount: discountAmount || undefined, discountReason: discountReason || undefined, attachments: attachmentUrl ? [{ id: uid("att"), name: "Supporting document", url: attachmentUrl, addedAt: new Date().toISOString() }] : undefined, recurring: recurring || null });
+    addInvoice({ kind, customerId: cid, items: items.filter((i) => i.description), issueDate: today, dueDate: addDays(today, dueDays), status, notes, discountAmount: discountAmount || undefined, discountReason: discountReason || undefined, attachments: attachmentUrl ? [{ id: uid("att"), name: "Supporting document", url: attachmentUrl, retentionUntil: new Date(new Date().setFullYear(new Date().getFullYear() + 7)).toISOString(), addedAt: new Date().toISOString() }] : undefined, recurring: recurring || null });
     setItems([{ id: uid(), description: "", qty: 1, unitPrice: 0, taxable: vat > 0 }]); setCustomerId(""); setNewCust(""); setNotes(""); setDiscountAmount(0); setDiscountReason(""); setAttachmentUrl(""); setRecurring("");
     onClose();
   };
