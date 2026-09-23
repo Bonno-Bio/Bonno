@@ -28,13 +28,14 @@ export default function Assistant() {
       invoices: store.invoices, payments: store.payments, expenses: store.expenses, customers: store.customers, products: store.products,
       vatRate: store.business?.vatRate ?? 0, businessName: store.business?.name ?? "",
     });
-    setMsgs((m) => [...m, { role: "user", text }, { role: "assistant", text: a }]);
+    setMsgs((m) => [...m, { role: "user", text }, { role: "assistant", text: `${a}\n\nSource records: current invoices, payments, expenses, customers and inventory.\nConfidence: grounded in the records available on this device.\nThis is business guidance, not tax or legal advice.` }]);
     setQ("");
   };
 
   return (
     <div className="flex h-[calc(100vh-9rem)] flex-col md:h-[calc(100vh-7rem)]">
       <PageHeader title="AI Assistant" subtitle={`${remaining === Infinity ? "Unlimited" : remaining} credit${remaining === 1 ? "" : "s"} left this month · ${ent.limitFor("ai_credits_per_month")} on ${ent.effectivePlan}`} />
+      <p className="mb-2 text-[11px] text-slate-500">Answers use your recorded business data. Check source records before acting; KgweboOS does not provide tax or legal advice.</p>
       <div className="card flex-1 space-y-3 overflow-y-auto">
         {msgs.map((m, i) => (
           <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
