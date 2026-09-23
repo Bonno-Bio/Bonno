@@ -66,7 +66,7 @@ function Inventory() {
                     </div>
                     {p.trackStock ? (
                       <div className="flex items-center gap-1">
-                        <button className="btn-secondary p-1.5" onClick={() => adjustStock(p.id, -1, "adjustment")}><Minus size={14} /></button>
+                        <button className="btn-secondary p-1.5" title="Report shrinkage" onClick={() => { const qty = Number(prompt(`How many ${p.name} units are missing?`, "1")); if (qty > 0) adjustStock(p.id, -qty, "shrinkage", prompt("Reason (optional)") || "Unaccounted stock"); }}><Minus size={14} /></button>
                         <span className={cn("w-10 text-center font-semibold", lowP && "text-amber-700")}>{p.stockQty}</span>
                         <button className="btn-secondary p-1.5" onClick={() => adjustStock(p.id, 1, "purchase")}><PackagePlus size={14} /></button>
                       </div>

@@ -22,7 +22,7 @@ const METHODS: { id: PaymentMethod; label: string }[] = [
 
 function Invoices() {
   const params = useSearchParams();
-  const { invoices, customers, business, recordPayment, addReminder, deleteInvoice, updateInvoice, convertQuoteToInvoice, notify } = useStore();
+  const { invoices, customers, business, recordPayment, addReminder, deleteInvoice, requestApproval, updateInvoice, convertQuoteToInvoice, notify } = useStore();
   const ent = useEntitlements();
   const [tab, setTab] = useState<DocKind>("invoice");
   const [open, setOpen] = useState(false);
@@ -93,7 +93,7 @@ function Invoices() {
                   {i.kind === "quote" && i.status !== "void" && (
                     <button className="btn-secondary px-2 py-1 text-xs" onClick={() => { const inv = convertQuoteToInvoice(i.id); if (inv) { setTab("invoice"); notify("Quote converted", `${i.number} → ${inv.number}`); } }}><ArrowRightLeft size={14} /> Convert to invoice</button>
                   )}
-                  <button className="btn-ghost ml-auto px-2 py-1 text-xs text-rose-600" onClick={() => confirm("Delete?") && deleteInvoice(i.id)}><Trash2 size={14} /></button>
+                  <button className="btn-ghost ml-auto px-2 py-1 text-xs text-rose-600" onClick={() => { if (!confirm(i.status === "draft" ? "Delete draft?" : "Request approval to void this invoice?")) return; if (i.status === "draft") deleteInvoice(i.id); else requestApproval({ action: "void_invoice", entity: "invoice", entityId: i.id, reason: `Void ${i.number} for ${custById[i.customerId]?.name ?? "customer"}` }); }}><Trash2 size={14} />{i.status !== "draft" && " Request void"}</button>
                 </div>
               </li>
             );
@@ -142,6 +142,8 @@ function NewDocModal({ open, onClose, defaultKind }: { open: boolean; onClose: (
   const [dueDays, setDueDays] = useState(7);
   const [recurring, setRecurring] = useState<"" | "monthly" | "weekly">("");
   const [notes, setNotes] = useState("");
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [discountReason, setDiscountReason] = useState("");
   useEffect(() => { setKind(defaultKind); }, [defaultKind, open]);
 
   const totals = invoiceTotals({ items }, vat);
@@ -159,8 +161,8 @@ function NewDocModal({ open, onClose, defaultKind }: { open: boolean; onClose: (
     if (!cid && newCust) cid = addCustomer({ name: newCust }).id;
     if (!cid) return;
     const today = todayISO();
-    addInvoice({ kind, customerId: cid, items: items.filter((i) => i.description), issueDate: today, dueDate: addDays(today, dueDays), status, notes, recurring: recurring || null });
-    setItems([{ id: uid(), description: "", qty: 1, unitPrice: 0, taxable: vat > 0 }]); setCustomerId(""); setNewCust(""); setNotes(""); setRecurring("");
+    addInvoice({ kind, customerId: cid, items: items.filter((i) => i.description), issueDate: today, dueDate: addDays(today, dueDays), status, notes, discountAmount: discountAmount || undefined, discountReason: discountReason || undefined, recurring: recurring || null });
+    setItems([{ id: uid(), description: "", qty: 1, unitPrice: 0, taxable: vat > 0 }]); setCustomerId(""); setNewCust(""); setNotes(""); setDiscountAmount(0); setDiscountReason(""); setRecurring("");
     onClose();
   };
 
@@ -211,7 +213,8 @@ function NewDocModal({ open, onClose, defaultKind }: { open: boolean; onClose: (
                 <option value="">No</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>
               </select>
             </Field>
-            <Field label="Notes"><input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Payment terms…" /></Field>
+            <div className="grid gap-3 sm:grid-cols-2"><Field label="Discount (BWP)"><input className="input" type="number" min="0" value={discountAmount || ""} onChange={(e) => setDiscountAmount(Number(e.target.value))} placeholder="0" /></Field><Field label="Discount reason"><input className="input" value={discountReason} onChange={(e) => setDiscountReason(e.target.value)} placeholder="Optional explanation" /></Field></div>
+          <Field label="Notes"><input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Payment terms…" /></Field>
           </div>
 
           <div className="rounded-xl bg-slate-50 p-3 text-sm">

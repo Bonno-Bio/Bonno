@@ -47,7 +47,8 @@ export function invoiceTotals(inv: Pick<Invoice, "items">, vatRate: number) {
   const subtotal = inv.items.reduce((s, i) => s + lineTotal(i), 0);
   const taxable = inv.items.filter((i) => i.taxable).reduce((s, i) => s + lineTotal(i), 0);
   const vat = +(taxable * vatRate).toFixed(2);
-  return { subtotal, vat, total: +(subtotal + vat).toFixed(2) };
+  const discount = Math.min(subtotal, Math.max(0, (inv as Invoice & { discountAmount?: number }).discountAmount ?? 0));
+  return { subtotal, discount, vat, total: +(subtotal - discount + vat).toFixed(2) };
 }
 
 export function padNumber(n: number, width = 4): string {

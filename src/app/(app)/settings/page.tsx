@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { useEntitlements } from "@/lib/useEntitlements";
 import { PageHeader, Field, StatusBadge } from "@/components/ui";
+import { Check, X, ShieldAlert } from "lucide-react";
 import { UpgradePrompt } from "@/components/Paywall";
 import { fmtDate } from "@/lib/utils";
 import type { Role } from "@/lib/types";
@@ -20,7 +21,7 @@ const ROLES: { id: Role; label: string; desc: string; premium?: boolean }[] = [
 ];
 
 export default function Settings() {
-  const { business, user, auditLogs, pendingOps } = useStore();
+  const { business, user, auditLogs, approvals, pendingOps, resolveApproval } = useStore();
   const ent = useEntitlements();
   const auth = useAuth();
   const [b, setB] = useState({ name: business?.name ?? "", phone: business?.phone ?? "", email: business?.email ?? "", address: business?.address ?? "", vatNumber: business?.vatNumber ?? "", vat: (business?.vatRate ?? 0) > 0 });
@@ -86,6 +87,16 @@ export default function Settings() {
         <div className="flex items-center justify-between"><h2 className="font-semibold">Data & sync</h2><StatusBadge status={pendingOps.length ? "sent" : "paid"} /></div>
         <p className="mt-1 text-sm text-slate-500">{pendingOps.length} change{pendingOps.length === 1 ? "" : "s"} waiting to sync. Data is stored on this device and encrypted in transit when synced. Your business owns its data — export any time.</p>
         <button className="btn-secondary mt-2" onClick={() => { const blob = new Blob([JSON.stringify(useStore.getState(), null, 2)], { type: "application/json" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "kgweboos-export.json"; a.click(); }}>Export all data (JSON)</button>
+      </section>
+
+      <section className="card space-y-3">
+        <div className="flex items-center justify-between"><h2 className="font-semibold">Approval queue</h2><span className="badge bg-amber-100 text-amber-800">{approvals.filter((a) => a.status === "pending").length} pending</span></div>
+        {approvals.filter((a) => a.status === "pending").length ? <ul className="space-y-2">{approvals.filter((a) => a.status === "pending").slice(0, 20).map((a) => <li key={a.id} className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm"><div className="flex items-start gap-2"><ShieldAlert size={16} className="mt-0.5 text-amber-700" /><div className="min-w-0 flex-1"><div className="font-medium capitalize">{a.action.replaceAll("_", " ")}</div><div className="text-xs text-slate-600">{a.reason} · requested by {a.requestedBy}</div><div className="mt-2 flex gap-1"><button className="btn-primary px-2 py-1 text-xs" onClick={() => resolveApproval(a.id, "approved")}><Check size={13} /> Approve</button><button className="btn-ghost px-2 py-1 text-xs text-rose-700" onClick={() => resolveApproval(a.id, "rejected")}><X size={13} /> Reject</button></div></div></div></li>)}</ul> : <p className="text-sm text-slate-500">No sensitive actions are waiting for approval.</p>}
+      </section>
+
+      <section className="card">
+        <div className="mb-2 flex items-center justify-between"><h2 className="font-semibold">Audit exceptions</h2><span className="text-xs text-slate-500">Unresolved warnings</span></div>
+        <ul className="max-h-48 divide-y divide-slate-100 overflow-y-auto text-xs">{auditLogs.filter((l) => l.exception && !l.resolvedAt).slice(0, 30).map((l) => <li key={l.id} className="flex justify-between py-2"><span><b className="text-amber-700">{l.action}</b> <span className="text-slate-400">{l.entityId}</span></span><span className="text-slate-400">{fmtDate(l.createdAt)}</span></li>)}{!auditLogs.some((l) => l.exception && !l.resolvedAt) && <li className="py-2 text-slate-400">No unresolved exceptions.</li>}</ul>
       </section>
 
       <section className="card">

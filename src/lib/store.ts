@@ -10,6 +10,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type {
   AuditLog,
+  ApprovalRequest,
   Business,
   Customer,
   CollectionReminder,
@@ -46,6 +47,7 @@ interface State {
   payments: Payment[];
   expenses: Expense[];
   auditLogs: AuditLog[];
+  approvals: ApprovalRequest[];
   notifications: Notification[];
   pendingOps: PendingOp[];
   aiCreditsUsed: number;
@@ -67,6 +69,8 @@ interface State {
   addReminder: (r: Omit<CollectionReminder, "id" | "businessId" | "sentAt">) => CollectionReminder;
   updateReminder: (id: string, patch: Partial<CollectionReminder>) => void;
   deleteCustomer: (id: string) => void;
+  requestApproval: (a: Omit<ApprovalRequest, "id" | "businessId" | "createdAt" | "status" | "requestedBy">) => ApprovalRequest;
+  resolveApproval: (id: string, status: "approved" | "rejected") => void;
 
   // products
   addProduct: (p: Omit<Product, "id" | "businessId" | "createdAt">) => Product;
@@ -89,12 +93,13 @@ interface State {
 
   // misc
   useAiCredit: () => void;
-  log: (action: string, entity: string, entityId?: string) => void;
+  log: (action: string, entity: string, entityId?: string, severity?: "info" | "warning" | "critical", exception?: boolean) => void;
   notify: (title: string, body: string) => void;
   markAllRead: () => void;
   clearPending: () => void;
 }
 
+const invoiceSubtotal = (items: { qty: number; unitPrice: number }[]) => items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0);
 const nowISO = () => new Date().toISOString();
 const monthKey = () => new Date().toISOString().slice(0, 7);
 
@@ -120,6 +125,7 @@ export const useStore = create<State>()(
         payments: [],
         expenses: [],
         auditLogs: [],
+        approvals: [],
         notifications: [],
         pendingOps: [],
         aiCreditsUsed: 0,
@@ -143,7 +149,7 @@ export const useStore = create<State>()(
         signOut: () =>
           set({
             business: null, user: null, subscription: null, customers: [], reminders: [], products: [], stockMovements: [],
-            invoices: [], payments: [], expenses: [], auditLogs: [], notifications: [], pendingOps: [], aiCreditsUsed: 0,
+            invoices: [], payments: [], expenses: [], auditLogs: [], approvals: [], notifications: [], pendingOps: [], aiCreditsUsed: 0,
           }),
 
         loadDemo: () => {
@@ -235,6 +241,22 @@ export const useStore = create<State>()(
           push("reminders", "update", { id, ...patch });
         },
 
+        requestApproval: (a) => {
+          const rec: ApprovalRequest = { ...a, id: uid("apr"), businessId: bid(), status: "pending", requestedBy: get().user?.email ?? "system", createdAt: nowISO() };
+          set((s) => ({ approvals: [rec, ...s.approvals] }));
+          get().log("approval.requested", a.entity, a.entityId, "warning", true);
+          get().notify("Approval required", `${a.action.replaceAll("_", " ")} is waiting for review.`);
+          return rec;
+        },
+        resolveApproval: (id, status) => {
+          const rec = get().approvals.find((a) => a.id === id);
+          if (!rec) return;
+          set((s) => ({ approvals: s.approvals.map((a) => a.id === id ? { ...a, status, resolvedAt: nowISO(), resolvedBy: s.user?.email ?? "system" } : a) }));
+          if (status === "approved" && rec.action === "void_invoice") get().updateInvoice(rec.entityId, { status: "void" });
+          if (status === "approved" && rec.action === "stock_adjustment") get().notify("Stock adjustment approved", rec.reason);
+          get().log(`approval.${status}`, rec.entity, rec.entityId, status === "approved" ? "info" : "warning", status !== "approved");
+        },
+
         addProduct: (p) => {
           const rec: Product = { ...p, id: uid("prd"), businessId: bid(), createdAt: nowISO() };
           set((s) => ({ products: [rec, ...s.products] }));
@@ -261,6 +283,10 @@ export const useStore = create<State>()(
             products: s.products.map((p) => (p.id === productId ? { ...p, stockQty: p.stockQty + qty } : p)),
           }));
           push("stock_movements", "insert", mv);
+          if (type === "shrinkage" || (type === "adjustment" && qty < 0)) {
+            get().log("stock.shrinkage_detected", "product", productId, "warning", true);
+            get().notify("Stock exception", `${get().products.find((x) => x.id === productId)?.name ?? "Stock"}: ${Math.abs(qty)} unit${Math.abs(qty) === 1 ? "" : "s"} unaccounted for.`);
+          }
           const p = get().products.find((x) => x.id === productId);
           if (p && p.trackStock && p.stockQty <= p.lowStockThreshold) {
             get().notify("Low stock", `${p.name} is down to ${p.stockQty}. Time to reorder.`);
@@ -283,6 +309,10 @@ export const useStore = create<State>()(
             });
           }
           get().log(`${rec.kind}.created`, rec.kind, rec.id);
+          if (rec.discountAmount && rec.discountAmount > invoiceSubtotal(rec.items) * 0.1) {
+            get().log("invoice.large_discount", "invoice", rec.id, "warning", true);
+            get().notify("Large discount recorded", `${rec.number} includes a discount above 10%; review the audit trail.`);
+          }
           return rec;
         },
         updateInvoice: (id, patch) => {
@@ -328,9 +358,9 @@ export const useStore = create<State>()(
         useAiCredit: () =>
           set((s) => (s.aiCreditsMonth === monthKey() ? { aiCreditsUsed: s.aiCreditsUsed + 1 } : { aiCreditsUsed: 1, aiCreditsMonth: monthKey() })),
 
-        log: (action, entity, entityId) =>
+        log: (action, entity, entityId, severity = "info", exception = false) =>
           set((s) => ({
-            auditLogs: [{ id: uid("log"), businessId: s.business?.id ?? "", actor: s.user?.email ?? "system", action, entity, entityId, createdAt: nowISO() }, ...s.auditLogs].slice(0, 500),
+            auditLogs: [{ id: uid("log"), businessId: s.business?.id ?? "", actor: s.user?.email ?? "system", action, entity, entityId, severity, exception, createdAt: nowISO() }, ...s.auditLogs].slice(0, 500),
           })),
         notify: (title, body) =>
           set((s) => ({ notifications: [{ id: uid("ntf"), businessId: s.business?.id ?? "", title, body, read: false, createdAt: nowISO() }, ...s.notifications].slice(0, 100) })),

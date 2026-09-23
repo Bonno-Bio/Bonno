@@ -91,7 +91,7 @@ export interface Product {
   createdAt: string;
 }
 
-export type StockMovementType = "purchase" | "sale" | "adjustment" | "return";
+export type StockMovementType = "purchase" | "sale" | "adjustment" | "return" | "shrinkage";
 export interface StockMovement {
   id: ID;
   businessId: ID;
@@ -125,6 +125,8 @@ export interface Invoice {
   dueDate: string;
   status: InvoiceStatus;
   notes?: string;
+  discountAmount?: number;
+  discountReason?: string;
   recurring?: "monthly" | "weekly" | null;
   createdAt: string;
 }
@@ -177,7 +179,26 @@ export interface AuditLog {
   action: string;
   entity: string;
   entityId?: ID;
+  severity?: "info" | "warning" | "critical";
+  exception?: boolean;
+  resolvedAt?: string;
   createdAt: string;
+}
+
+export type ApprovalAction = "void_invoice" | "stock_adjustment" | "large_discount";
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+export interface ApprovalRequest {
+  id: ID;
+  businessId: ID;
+  action: ApprovalAction;
+  entity: string;
+  entityId: ID;
+  reason: string;
+  requestedBy: string;
+  status: ApprovalStatus;
+  createdAt: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
 }
 
 export interface Notification {
