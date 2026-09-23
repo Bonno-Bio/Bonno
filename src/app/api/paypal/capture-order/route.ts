@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { captureOrder, serverVerificationEnabled } from "@/lib/paypal/server";
 import { PRICING, type BillingInterval } from "@/lib/paypal/config";
+import { activateSubscription } from "@/lib/firebase/admin";
 
 /**
  * POST { orderId, interval, businessId }
@@ -16,8 +17,11 @@ export async function POST(req: Request) {
     const expected = PRICING[interval];
     const ok = cap.status === "COMPLETED" && cap.amount?.value === expected.usd && cap.amount?.currency_code === "USD";
     if (!ok) return NextResponse.json({ error: "capture_mismatch", capture: cap }, { status: 409 });
-    // TODO (Supabase): upsert subscriptions + insert payments_billing (idempotent on cap.captureId).
-    return NextResponse.json({ ok: true, reference: cap.captureId ?? cap.id, months: expected.months, amountUSD: cap.amount!.value, amountBWP: expected.bwp, businessId, payerEmail: cap.payerEmail });
+    const reference = cap.captureId ?? cap.id;
+    const bid = businessId ?? cap.customId?.split(":")[0];
+    let persisted = false;
+    if (bid) ({ persisted } = await activateSubscription({ businessId: bid, reference, months: expected.months, interval, amountUSD: cap.amount!.value, amountBWP: expected.bwp, payerEmail: cap.payerEmail }));
+    return NextResponse.json({ ok: true, reference, months: expected.months, amountUSD: cap.amount!.value, amountBWP: expected.bwp, businessId: bid, payerEmail: cap.payerEmail, persisted });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });
   }

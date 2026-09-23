@@ -10,6 +10,7 @@ import { useStore, useHydrated } from "@/lib/store";
 import { useEntitlements } from "@/lib/useEntitlements";
 import { cn } from "@/lib/utils";
 import { SubscriptionBanner } from "./Paywall";
+import { useAuth } from "@/lib/firebase/AuthProvider";
 import { StatusBadge } from "./ui";
 
 const NAV = [
@@ -29,6 +30,7 @@ const MOBILE_NAV = NAV.slice(0, 5);
 export function AppShell({ children }: { children: React.ReactNode }) {
   const hydrated = useHydrated();
   const business = useStore((s) => s.business);
+  const auth = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -42,10 +44,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (hydrated && !business) router.replace("/register");
-  }, [hydrated, business, router]);
+    if (!hydrated || !auth.ready) return;
+    if (auth.mode === "firebase") {
+      if (!auth.fbUser) router.replace("/login");
+      else if (auth.businessId === null) router.replace("/register");
+    } else if (!business) router.replace("/register");
+  }, [hydrated, business, router, auth.ready, auth.mode, auth.fbUser, auth.businessId]);
 
-  if (!hydrated || !business) {
+  if (!hydrated || !auth.ready || !business) {
     return <div className="flex min-h-screen items-center justify-center text-sm text-slate-400">Loading KgweboOS…</div>;
   }
 
@@ -125,8 +131,9 @@ function NavLink({ href, label, icon: Icon, active, onClick }: { href: string; l
 
 function PlanCard() {
   const ent = useEntitlements();
-  const signOut = useStore((s) => s.signOut);
+  const auth = useAuth();
   const router = useRouter();
+  const signOut = () => { void auth.signOut().then(() => router.replace("/")); };
   return (
     <div className="m-3 rounded-xl border border-slate-200 p-3 text-xs">
       <div className="flex items-center justify-between">
@@ -135,7 +142,7 @@ function PlanCard() {
       </div>
       {ent.daysLeft !== null && <div className="mt-1 text-slate-500">{ent.daysLeft} days left</div>}
       {ent.effectivePlan !== "premium" && <Link href="/billing" className="btn-primary mt-2 w-full py-1.5 text-xs">Upgrade · P47/mo</Link>}
-      <button className="btn-ghost mt-2 w-full py-1.5 text-xs" onClick={() => { signOut(); router.replace("/"); }}><LogOut size={14} /> Sign out</button>
+      <button className="btn-ghost mt-2 w-full py-1.5 text-xs" onClick={signOut}><LogOut size={14} /> Sign out</button>
     </div>
   );
 }
@@ -145,7 +152,7 @@ function SyncIndicator() {
   const clear = useStore((s) => s.clearPending);
   if (!pending) return null;
   return (
-    <button title="Pending changes to sync (Supabase adapter not connected yet)" onClick={clear} className="flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600">
+    <button title={pending + " change(s) waiting to sync"} onClick={() => { if (confirm("Discard unsynced changes? Only do this if sync is stuck.")) clear(); }} className="flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600">
       <CloudUpload size={14} /> {pending}
     </button>
   );

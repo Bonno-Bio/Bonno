@@ -6,6 +6,9 @@ import { PageHeader, Field, StatusBadge } from "@/components/ui";
 import { UpgradePrompt } from "@/components/Paywall";
 import { fmtDate } from "@/lib/utils";
 import type { Role } from "@/lib/types";
+import { syncBridge } from "@/lib/firebase/bridge";
+import { createInvite } from "@/lib/firebase/invites";
+import { useAuth } from "@/lib/firebase/AuthProvider";
 
 const ROLES: { id: Role; label: string; desc: string; premium?: boolean }[] = [
   { id: "owner", label: "Owner / Admin", desc: "Full access incl. billing" },
@@ -19,6 +22,7 @@ const ROLES: { id: Role; label: string; desc: string; premium?: boolean }[] = [
 export default function Settings() {
   const { business, user, auditLogs, pendingOps } = useStore();
   const ent = useEntitlements();
+  const auth = useAuth();
   const [b, setB] = useState({ name: business?.name ?? "", phone: business?.phone ?? "", email: business?.email ?? "", address: business?.address ?? "", vatNumber: business?.vatNumber ?? "", vat: (business?.vatRate ?? 0) > 0 });
   const [invite, setInvite] = useState({ email: "", role: "manager" as Role });
   const [saved, setSaved] = useState(false);
@@ -26,13 +30,19 @@ export default function Settings() {
   const save = () => {
     useStore.setState({ business: { ...business!, name: b.name, phone: b.phone, email: b.email, address: b.address, vatNumber: b.vat ? b.vatNumber : undefined, vatRate: b.vat ? 0.14 : 0 } });
     useStore.getState().log("business.updated", "business", business?.id);
+    syncBridge.onBusinessUpdated?.(useStore.getState().business!);
     setSaved(true); setTimeout(() => setSaved(false), 1500);
   };
 
-  const sendInvite = () => {
-    if (!invite.email) return;
+  const sendInvite = async () => {
+    if (!invite.email || !business) return;
     useStore.getState().log("user.invited", "user", invite.email);
-    useStore.getState().notify("Invite sent", `${invite.email} invited as ${invite.role}. (Email delivery is wired up with the auth provider.)`);
+    if (auth.mode === "firebase") {
+      await createInvite(business.id, business.name, invite.email, invite.role);
+      useStore.getState().notify("Invite created", `${invite.email} can now sign in with this email and will join ${business.name} as ${invite.role}.`);
+    } else {
+      useStore.getState().notify("Invite (local mode)", `Invites are delivered once Firebase is connected.`);
+    }
     setInvite({ email: "", role: "manager" });
   };
 

@@ -23,6 +23,7 @@ import type {
 } from "./types";
 import { TRIAL_DAYS } from "./plans";
 import { addDays, padNumber, todayISO, uid } from "./utils";
+import { syncBridge } from "./firebase/bridge";
 
 export interface PendingOp {
   id: string;
@@ -55,6 +56,7 @@ interface State {
   loadDemo: () => void;
 
   // subscription
+  setSubscription: (sub: Subscription) => void;
   activatePremium: (ref: string, months: number, interval: "monthly" | "annual", payerEmail?: string) => void;
   cancelPremium: () => void;
   simulateTrialEnd: () => void;
@@ -97,8 +99,10 @@ export const useStore = create<State>()(
   persist(
     (set, get) => {
       const bid = () => get().business?.id ?? "";
-      const push = (entity: string, op: PendingOp["op"], payload: unknown) =>
+      const push = (entity: string, op: PendingOp["op"], payload: unknown) => {
         set((s) => ({ pendingOps: [...s.pendingOps, { id: uid("op"), entity, op, payload, at: nowISO() }] }));
+        syncBridge.onPendingOps?.();
+      };
 
       return {
         hydrated: false,
@@ -128,6 +132,7 @@ export const useStore = create<State>()(
             trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000).toISOString(),
           };
           set({ business, user, subscription });
+          void syncBridge.onBusinessCreated?.(business, user, subscription);
           get().log("business.registered", "business", id);
           get().notify("Welcome to KgweboOS 🎉", `Your ${TRIAL_DAYS}-day Premium trial has started. Explore everything for free.`);
         },
@@ -181,6 +186,7 @@ export const useStore = create<State>()(
           st.addExpense({ category: "Airtime & data", amount: 150, vendor: "Mascom", date: today });
         },
 
+        setSubscription: (subscription) => set({ subscription }),
         activatePremium: (ref, months, interval, payerEmail) => {
           const sub = get().subscription;
           if (!sub) return;

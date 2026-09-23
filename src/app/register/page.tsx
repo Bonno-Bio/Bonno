@@ -6,6 +6,8 @@ import { ArrowRight, ArrowLeft } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { Field } from "@/components/ui";
 import { TRIAL_DAYS } from "@/lib/plans";
+import { useAuth } from "@/lib/firebase/AuthProvider";
+import { useEffect } from "react";
 
 const INDUSTRIES = [
   "Salon / Barber", "Retail shop", "Restaurant / Café", "Consultant / Freelancer", "Contractor / Workshop",
@@ -15,8 +17,17 @@ const INDUSTRIES = [
 export default function Register() {
   const router = useRouter();
   const register = useStore((s) => s.registerBusiness);
+  const auth = useAuth();
   const [step, setStep] = useState(0);
   const [f, setF] = useState({ name: "", email: "", phone: "", business: "", industry: INDUSTRIES[0], address: "", vatNumber: "", vatRegistered: false });
+  useEffect(() => {
+    if (auth.mode !== "firebase" || !auth.ready) return;
+    if (!auth.fbUser) { router.replace("/login"); return; }
+    if (auth.businessId) { router.replace("/dashboard"); return; }
+    setF((x) => ({ ...x, name: x.name || auth.fbUser?.displayName || "", email: x.email || auth.fbUser?.email || "" }));
+    setStep((s) => (s === 0 && auth.fbUser?.email ? 1 : s));
+  }, [auth.mode, auth.ready, auth.fbUser, auth.businessId, router]);
+
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setF({ ...f, [k]: e.target.type === "checkbox" ? (e.target as HTMLInputElement).checked : e.target.value });
 

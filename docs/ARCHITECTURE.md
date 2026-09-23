@@ -20,12 +20,19 @@ src/lib/
 src/components/
   AppShell.tsx      Layout, nav, plan card, sync + notification indicators
   Paywall.tsx       <Gate feature>, <LimitGate limit>, <UpgradePrompt>, <SubscriptionBanner>
-supabase/migrations Postgres schema with business_id on every table + RLS policies
+src/lib/firebase/
+  client.ts         Firebase app/auth/Firestore (persistent offline cache); isFirebaseConfigured → local mode
+  AuthProvider.tsx  Auth context; resolves user → business; attaches sync
+  sync.ts           Store ⇄ Firestore: drains pendingOps, live snapshot listeners, invite acceptance
+  admin.ts          Firebase Admin (server): activateSubscription (idempotent, transactional), revoke
+  invites.ts        Team invites (matched by email on sign-in)
+firestore.rules     Tenant isolation: membership doc required; subscription/billing writable by server only
 ```
 
-## Multi-tenancy
-* Every row has `business_id`. RLS policy `is_member(business_id)` enforces isolation at the DB.
-* `subscriptions` / `payments_billing` are writable only by the service role (webhooks), never by clients.
+## Multi-tenancy (Firebase)
+* All tenant data lives under `businesses/{bid}/…`. Rules require `businesses/{bid}/members/{uid}` to exist for any read/write.
+* Roles: owner/manager can update the business and invite; auditor is read-only; everyone else read/write tenant data.
+* `meta/subscription` and `billing_payments` are **server-only writes** (Admin SDK from PayPal capture/webhook). A client can never grant itself Premium.
 
 ## Entitlements
 All premium checks go through `getEntitlements(subscription)`:
@@ -40,8 +47,13 @@ All premium checks go through `getEntitlements(subscription)`:
 UI uses `useEntitlements()`; server routes should call the same function with the DB subscription row before mutating.
 
 ## Offline-first
-The store persists to `localStorage` and records every mutation in `pendingOps`. A sync adapter
-(`src/lib/sync/supabase.ts`, next step) replays these against Supabase when online and reconciles by `id`.
+Two layers: the zustand store persists to `localStorage` and queues `pendingOps`; `sync.ts` drains them into
+Firestore, which itself has persistent offline cache. Live `onSnapshot` listeners hydrate the store, so two phones
+in the same business see each other's invoices in real time.
+
+## Modes
+* **Local mode** (no `NEXT_PUBLIC_FIREBASE_*`): no login, demo button on landing, data in browser only.
+* **Firebase mode**: `/login` (email/password, Google) → `/register` business (if none) → dashboard with sync.
 
 ## Billing flow
 register → trial → banner countdown → `/billing` → `<PayPalCheckout>` (PayPal button or Visa/Mastercard card fields)
@@ -53,8 +65,8 @@ register → trial → banner countdown → `/billing` → `<PayPalCheckout>` (P
 Prices live in `plans.ts` (BWP) and are converted to USD in `lib/paypal/config.ts`.
 
 ## Next steps (Phase 1 → 3)
-1. Supabase Auth (email/phone OTP + 2FA) and the sync adapter.
-2. Set `PAYPAL_CLIENT_SECRET` + `PAYPAL_WEBHOOK_ID`; persist captures to `payments_billing`.
-3. Background jobs: recurring invoices, T-3 reminders, overdue marking, monthly AI credit reset.
+1. ~~Auth + sync~~ ✅ Firebase. Add phone OTP + MFA enrolment.
+2. Set `PAYPAL_CLIENT_SECRET` + `PAYPAL_WEBHOOK_ID` + `FIREBASE_SERVICE_ACCOUNT_JSON` in hosting env.
+3. Cloud Functions + Scheduler: recurring invoices, T-3 reminders, overdue marking, monthly AI credit reset.
 4. LLM-backed assistant with per-tenant cost caps; receipt OCR.
 5. PostHog events: activation (first invoice), premium conversion, churn.

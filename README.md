@@ -31,6 +31,24 @@ npm run dev      # http://localhost:3000
 Click **"Try the demo salon"** on the landing page to load sample data, or register a business.
 On `/billing` there's a *"Dev: simulate trial ending"* button to see the Free-plan limits kick in.
 
+## Firebase setup (auth + cloud sync)
+
+Without Firebase env vars the app runs in **local mode** (data only in the browser — good for demos).
+To go multi-device / multi-user:
+
+1. Create a project at console.firebase.google.com → add a **Web app** → copy the config into `.env.local` as `NEXT_PUBLIC_FIREBASE_*`.
+2. **Authentication → Sign-in method**: enable *Email/Password* and *Google*.
+3. **Firestore Database → Create** (production mode). Deploy rules & indexes:
+   ```bash
+   npx firebase-tools login
+   npx firebase-tools use <project-id>
+   npx firebase-tools deploy --only firestore
+   ```
+4. **Project settings → Service accounts → Generate new private key** → put the JSON (single line) in `FIREBASE_SERVICE_ACCOUNT_JSON`. This lets the PayPal capture/webhook routes write subscriptions server-side (clients can't — see rules).
+5. Add your preview/production domain under **Authentication → Settings → Authorized domains**.
+
+Data layout: `businesses/{bid}` → `members/`, `meta/subscription`, `billing_payments/`, `customers/`, `products/`, `stock_movements/`, `invoices/`, `payments/`, `expenses/`, `audit_logs/`. Plus top-level `users/{uid}` and `invites/`.
+
 ## Payments (PayPal)
 
 Premium is paid through PayPal — either the PayPal wallet or **Visa / Mastercard** entered directly (PayPal Advanced Card Fields; card data never touches our servers).
@@ -46,6 +64,6 @@ PayPal doesn't settle in BWP, so the charge is made in USD at `NEXT_PUBLIC_PAYPA
 Without the secret, the PayPal button still works (client-side capture) but card fields are disabled and captures aren't server-verified.
 
 ## Stack
-Next.js 14 · TypeScript · Tailwind · zustand (local-first, persisted) · PWA manifest · Supabase schema with RLS (`supabase/migrations`).
+Next.js 14 · TypeScript · Tailwind · zustand (local-first, persisted) · PWA manifest · **Firebase** (Auth + Firestore with offline persistence, security rules in `firestore.rules`) · PayPal.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the design, entitlement rules and roadmap.

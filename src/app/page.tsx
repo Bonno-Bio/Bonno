@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Check, FileText, Users, Receipt, Package, BarChart3, Sparkles, MessageCircle, ArrowRight } from "lucide-react";
 import { PLAN_MATRIX, PREMIUM_PRICE_MONTHLY, PREMIUM_PRICE_ANNUAL, TRIAL_DAYS } from "@/lib/plans";
 import { useStore, useHydrated } from "@/lib/store";
+import { useAuth } from "@/lib/firebase/AuthProvider";
 
 const MODULES = [
   { icon: FileText, title: "Invoices & quotes", body: "BURS-ready invoices with VAT, PDF export and payment tracking." },
@@ -18,7 +19,9 @@ export default function Landing() {
   const hydrated = useHydrated();
   const business = useStore((s) => s.business);
   const loadDemo = useStore((s) => s.loadDemo);
+  const auth = useAuth();
   const router = useRouter();
+  const start = auth.mode === "firebase" ? "/login" : "/register";
 
   return (
     <div className="min-h-screen bg-white">
@@ -32,7 +35,7 @@ export default function Landing() {
           {hydrated && business ? (
             <Link href="/dashboard" className="btn-primary">Open dashboard</Link>
           ) : (
-            <Link href="/register" className="btn-primary">Start free</Link>
+            <Link href={start} className="btn-primary">Start free</Link>
           )}
         </nav>
       </header>
@@ -47,10 +50,12 @@ export default function Landing() {
           Free to start. Premium for just <b>P{PREMIUM_PRICE_MONTHLY}/month</b>.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Link href="/register" className="btn-primary px-6 py-3 text-base">Start free — {TRIAL_DAYS}-day Premium trial <ArrowRight size={18} /></Link>
-          <button className="btn-secondary px-6 py-3 text-base" onClick={() => { loadDemo(); router.push("/dashboard"); }}>
-            Try the demo salon
-          </button>
+          <Link href={start} className="btn-primary px-6 py-3 text-base">Start free — {TRIAL_DAYS}-day Premium trial <ArrowRight size={18} /></Link>
+          {auth.mode === "local" && (
+            <button className="btn-secondary px-6 py-3 text-base" onClick={() => { loadDemo(); router.push("/dashboard"); }}>
+              Try the demo salon
+            </button>
+          )}
         </div>
         <p className="mt-3 text-xs text-slate-400">No card needed for the trial · Upgrade securely with PayPal or Visa / Mastercard</p>
       </section>
@@ -76,7 +81,7 @@ export default function Landing() {
             <div className="text-sm font-semibold text-slate-500">Free</div>
             <div className="mt-2 text-4xl font-bold">P0<span className="text-base font-normal text-slate-400">/month</span></div>
             <p className="mt-2 text-sm text-slate-500">For getting started: 2 users, 20 invoices/month, 100 customers, 50 products.</p>
-            <Link href="/register" className="btn-secondary mt-6 w-full">Start free</Link>
+            <Link href={start} className="btn-secondary mt-6 w-full">Start free</Link>
           </div>
           <div className="card border-emerald-500 p-6 ring-2 ring-emerald-500">
             <div className="flex items-center justify-between"><div className="text-sm font-semibold text-emerald-700">Premium</div><span className="badge bg-emerald-600 text-white">Most popular</span></div>
@@ -87,7 +92,7 @@ export default function Landing() {
                 <li key={f} className="flex items-start gap-2"><Check size={16} className="mt-0.5 shrink-0 text-emerald-600" />{f}</li>
               ))}
             </ul>
-            <Link href="/register" className="btn-primary mt-6 w-full">Start {TRIAL_DAYS}-day free trial</Link>
+            <Link href={start} className="btn-primary mt-6 w-full">Start {TRIAL_DAYS}-day free trial</Link>
           </div>
         </div>
 
