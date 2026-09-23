@@ -1,0 +1,3 @@
+import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
+export default function AdminLayout({ children }: { children: React.ReactNode }) { return <div className="min-h-screen bg-slate-950"><header className="border-b border-slate-800 bg-slate-900 text-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4"><Link href="/admin" className="flex items-center gap-2 font-semibold"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500"><ShieldCheck size={18} /></span> KgweboOS Admin</Link><Link href="/dashboard" className="text-xs text-slate-300 hover:text-white">Back to business app</Link></div></header><main className="mx-auto max-w-7xl p-4 sm:p-6">{children}</main></div> }
