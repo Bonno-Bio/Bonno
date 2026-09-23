@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isMember(bid) {
+      return signedIn() && exists(/databases/$(database)/documents/businesses/$(bid)/members/$(request.auth.uid));
+    }
+    function memberRole(bid) {
+      return get(/databases/$(database)/documents/businesses/$(bid)/members/$(request.auth.uid)).data.role;
+    }
+    function isOwnerOrManager(bid) { return isMember(bid) && memberRole(bid) in ['owner', 'manager']; }
+    function isReadOnlyRole(bid) { return isMember(bid) && memberRole(bid) == 'auditor'; }
+
+    // Users can read/write only their own profile doc
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Invites: created by owners/managers; readable by the invitee (by email) or business members
+    match /invites/{id} {
+      allow create: if signedIn() && isOwnerOrManager(request.resource.data.businessId);
+      allow read: if signedIn() && (isMember(resource.data.businessId) || resource.data.email == request.auth.token.email);
+      allow update: if signedIn() && resource.data.email == request.auth.token.email && request.resource.data.status == 'accepted';
+      allow delete: if signedIn() && isOwnerOrManager(resource.data.businessId);
+    }
+
+    match /businesses/{bid} {
+      // Anyone signed in may create a business they own; only members read; owner/manager update
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
+      allow read: if isMember(bid);
+      allow update: if isOwnerOrManager(bid);
+      allow delete: if false;
+
+      match /members/{uid} {
+        allow read: if isMember(bid);
+        // First member (owner) is written together with the business; later members via accepted invites
+        allow create: if signedIn() && request.auth.uid == uid &&
+          (request.resource.data.role == 'owner' && get(/databases/$(database)/documents/businesses/$(bid)).data.ownerUid == uid
+           || request.resource.data.role != 'owner');
+        allow update, delete: if isOwnerOrManager(bid) && uid != get(/databases/$(database)/documents/businesses/$(bid)).data.ownerUid;
+      }
+
+      // Subscription & billing are written by the SERVER (Admin SDK bypasses rules).
+      // Clients may only read, plus create the initial trial doc for their own new business.
+      match /meta/subscription {
+        allow read: if isMember(bid);
+        allow create: if signedIn() && get(/databases/$(database)/documents/businesses/$(bid)).data.ownerUid == request.auth.uid;
+        allow update, delete: if false;
+      }
+      match /billing_payments/{ref} {
+        allow read: if isOwnerOrManager(bid);
+        allow write: if false;
+      }
+
+      // Tenant data
+      match /{col}/{id} {
+        allow read: if isMember(bid) && col in ['customers','products','stock_movements','invoices','payments','expenses','audit_logs','reminders'];
+        allow write: if isMember(bid) && !isReadOnlyRole(bid)
+          && col in ['customers','products','stock_movements','invoices','payments','expenses','audit_logs','reminders']
+          && request.resource.data.businessId == bid;
+      }
+    }
+  }
+}

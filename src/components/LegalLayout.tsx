@@ -1,0 +1,7 @@
+import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
+import type { ReactNode } from "react";
+
+export function LegalLayout({ title, updated, children }: { title: string; updated: string; children: ReactNode }) {
+  return <div className="min-h-screen bg-slate-50"><header className="border-b bg-white"><div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4"><Link href="/" className="flex items-center gap-2 font-bold"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white">K</span> KgweboOS</Link><Link href="/login" className="text-sm text-emerald-700">Sign in</Link></div></header><main className="mx-auto max-w-3xl px-4 py-10"><div className="mb-8"><div className="mb-3 flex items-center gap-2 text-sm text-emerald-700"><ShieldCheck size={17}/> Trust & legal</div><h1 className="text-3xl font-bold text-slate-900">{title}</h1><p className="mt-2 text-xs text-slate-500">Last updated: {updated}</p></div><article className="prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-emerald-700">{children}</article><nav className="mt-10 flex flex-wrap gap-3 border-t pt-5 text-sm"><Link href="/terms">Terms</Link><Link href="/privacy">Privacy</Link><Link href="/data-policy">Data & retention</Link><Link href="/refunds">Billing & refunds</Link></nav><p className="mt-6 text-xs text-slate-400">These pages are product disclosures, not legal advice. KgweboOS should obtain Botswana legal and tax review before commercial launch.</p></main></div>;
+}
